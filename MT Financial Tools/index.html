@@ -247,13 +247,11 @@
             margin-bottom: 24px;
         }
 
-        @media (min-width: 640px) {
+	@media (min-width: 640px) {
             .app-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
-            .app-card:last-child {
-                grid-column: span 2; /* Centers the 5th card nicely */
-            }
+            /* The :last-child span rule has been removed so 6 cards form a perfect 2x3 grid */
         }
 
         .app-card {
@@ -363,11 +361,6 @@
                     <h3>Dividend Portfolio Sandbox</h3>
                     <p>Build your passive income through dividend investing. Allocate capital, track sector exposure, and project your monthly dividend cash flow. Before you build your dividend portfolio, build it here first.</p>
                 </a>
-
-               <a href="finance101/index.html" class="app-card">
-                  <h3>Personal Finance 101</h3>
-                  <p>Map out your net worth, track your monthly budget, and generate your personalized financial action plan.</p>
-              </a>
             </div>
 
             <button id="logout-btn" class="btn-danger">Disconnect / Log Out</button>
