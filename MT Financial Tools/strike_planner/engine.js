@@ -53,6 +53,17 @@ async function loadCloudProfile() {
                     document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
                 }
                 
+            } else if (data.state) { // Fallback for legacy format if needed
+                state = data.state;
+                if (state.startingCapital > 0) {
+                    document.getElementById('init-modal').classList.add('hidden');
+                    runEngine();
+                    renderTabs();
+                    buildSetForm();
+                    switchView('dashboard');
+                } else {
+                    document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+                }
             } else {
                 console.log("No Strike Planner data yet. Leaving Welcome Screen open.");
                 document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
@@ -288,13 +299,13 @@ function runEngine() {
 
     document.getElementById('dash-equity').innerText = fmtPHPDash(totalEquity);
     document.getElementById('dash-bp').innerText = fmtPHPDash(buyingPower);
-    document.getElementById('dash-bp').className = `text-2xl lg:text-3xl font-mono font-black leading-none truncate ${buyingPower < 0 ? 'text-red-500' : 'text-brand'}`;
+    document.getElementById('dash-bp').className = `text-xl sm:text-2xl lg:text-2xl xl:text-3xl font-mono font-black leading-none whitespace-nowrap overflow-x-auto custom-scroll-hidden ${buyingPower < 0 ? 'text-red-500' : 'text-brand'}`;
     
     document.getElementById('dash-unrealized').innerText = `${unrealizedPnl >= 0 ? '+' : ''}${fmtPHPDash(unrealizedPnl)}`;
-    document.getElementById('dash-unrealized').className = `text-2xl lg:text-3xl font-mono font-black leading-none truncate ${unrealizedPnl >= 0 ? 'text-brand' : 'text-red-500'}`;
+    document.getElementById('dash-unrealized').className = `text-xl sm:text-2xl lg:text-2xl xl:text-3xl font-mono font-black leading-none whitespace-nowrap overflow-x-auto custom-scroll-hidden ${unrealizedPnl >= 0 ? 'text-brand' : 'text-red-500'}`;
     
     document.getElementById('dash-realized').innerText = `${state.realizedPnl >= 0 ? '+' : ''}${fmtPHPDash(state.realizedPnl)}`;
-    document.getElementById('dash-realized').className = `text-2xl lg:text-3xl font-mono font-black leading-none truncate ${state.realizedPnl >= 0 ? 'text-brand' : 'text-red-500'}`;
+    document.getElementById('dash-realized').className = `text-xl sm:text-2xl lg:text-2xl xl:text-3xl font-mono font-black leading-none whitespace-nowrap overflow-x-auto custom-scroll-hidden ${state.realizedPnl >= 0 ? 'text-brand' : 'text-red-500'}`;
 
     updateCharts(buyingPower, tickerMap, sectorMap, currentNetValue, totalEquity);
     renderHoldingsSummary();
@@ -446,10 +457,11 @@ function buildSetForm() {
         <div class="w-full mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
             <label class="block text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-2">Technical Chart</label>
             <div id="paste-area" class="w-full aspect-video bg-white dark:bg-slate-900/30 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-brand transition-colors flex items-center justify-center relative overflow-hidden group shadow-inner">
-                <div class="text-center placeholder-text pointer-events-none ${s.image ? 'hidden' : ''}" id="img-placeholder">
+                <div class="text-center placeholder-text cursor-pointer ${s.image ? 'hidden' : ''}" id="img-placeholder" onclick="document.getElementById('chart-upload').click()">
                     <svg class="w-10 h-10 text-slate-400 mx-auto mb-3 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    <p class="text-base text-slate-500 font-bold">Paste <kbd class="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded font-mono text-sm">Ctrl+V</kbd> Image</p>
+                    <p class="text-base text-slate-500 font-bold">Tap to Upload or Paste <kbd class="hidden sm:inline-block px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded font-mono text-sm">Ctrl+V</kbd></p>
                 </div>
+                <input type="file" id="chart-upload" class="hidden" accept="image/*" onchange="handleImageUpload(event)">
                 <img id="img-preview" class="${s.image ? '' : 'hidden'} absolute inset-0 w-full h-full object-contain p-1 cursor-zoom-in" alt="Chart" onclick="viewImage(this.src)" src="${s.image || ''}" />
                 <button id="clear-img" onclick="clearImage(event)" class="${s.image ? '' : 'hidden'} absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded text-sm font-bold z-10 shadow-lg">✕</button>
             </div>
@@ -629,6 +641,20 @@ function buildSetForm() {
     });
     
     calcSet(false);
+}
+
+function handleImageUpload(e) {
+    if(e.target.files.length > 0) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const s = state.sets.find(w => w.id === state.activeSetId);
+            if(s) { 
+                s.image = ev.target.result; 
+                buildSetForm(); 
+            }
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    }
 }
 
 window.addEventListener('paste', e => {
@@ -979,16 +1005,6 @@ R:R: ${rr.toFixed(2)}`;
     navigator.clipboard.writeText(text).then(() => alert("Ticket Copied!"));
 }
 
-window.onload = () => {
-    if(state.startingCapital === 0) {
-        document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
-    } else {
-        runEngine();
-        renderTabs();
-        if(state.sets.length>0) buildSetForm();
-    }
-};
-
 function loadData(event) {
     const file = event.target.files[0]; 
     if(!file) return;
@@ -1014,10 +1030,11 @@ async function saveData() {
     }
 }
 
-// Since this is a module, expose needed functions to window so HTML inline handlers (onclick) still work
+// Expose all necessary functions to the global window object for HTML inline handlers
 window.startApp = startApp;
 window.executeNuclearReset = executeNuclearReset;
 window.hideResetModal = hideResetModal;
+window.openResetModal = openResetModal;
 window.closeImage = closeImage;
 window.setSellShares = setSellShares;
 window.calcSellPreview = calcSellPreview;
@@ -1028,7 +1045,6 @@ window.undoAction = undoAction;
 window.saveData = saveData;
 window.loadData = loadData;
 window.formatNumberInput = formatNumberInput;
-window.openResetModal = openResetModal;
 window.handleImageUpload = handleImageUpload;
 window.clearImage = clearImage;
 window.viewImage = viewImage;
@@ -1036,3 +1052,6 @@ window.updateSetData = updateSetData;
 window.manualShareInput = manualShareInput;
 window.copyTicket = copyTicket;
 window.openSellModal = openSellModal;
+window.buildSetForm = buildSetForm;
+window.renderTabs = renderTabs;
+window.runEngine = runEngine;
