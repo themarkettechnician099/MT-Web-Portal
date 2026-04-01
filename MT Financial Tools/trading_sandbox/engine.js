@@ -38,19 +38,32 @@ async function loadCloudProfile() {
         if (docSnap.exists()) {
             const data = docSnap.data();
             
-            // ONLY hide the modal and load if Strike Planner data specifically exists
-            if (data.strikePlannerState) {
-                state = data.strikePlannerState;
-                document.getElementById('init-modal').classList.add('hidden');
-                runEngine();
-                renderTabs();
-                buildSetForm();
-                switchView('dashboard');
+            // FIX 1: Look for the correct Trading Sandbox key
+            if (data.tradingSandboxState) {
+                state = data.tradingSandboxState;
+                
+                // FIX 2: Check if the ledger actually has entries (meaning you initialized it)
+                if (state.ledger && state.ledger.length > 0) {
+                    document.getElementById('init-modal').classList.add('hidden');
+                    runEngine();
+                    populateStrategyDropdowns();
+                    renderWlTabs();
+                    if(state.watchlist.length > 0) {
+                        loadWlTab(state.activeWlId);
+                    }
+                    switchView('dashboard');
+                } else {
+                    console.log("Poisoned save found (empty ledger). Forcing Welcome Screen.");
+                    document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+                }
+                
             } else {
-                console.log("No Strike Planner data yet. Leaving Welcome Screen open.");
+                console.log("No Trading Sandbox data yet. Leaving Welcome Screen open.");
+                document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
             }
         } else {
             console.log("No cloud profile found. Ready for initialization.");
+            document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
         }
     } catch (error) {
         console.error("Error loading cloud data:", error);
