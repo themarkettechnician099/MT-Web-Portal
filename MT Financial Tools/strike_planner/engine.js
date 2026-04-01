@@ -38,20 +38,28 @@ async function loadCloudProfile() {
         if (docSnap.exists()) {
             const data = docSnap.data();
             
-            // Inject cloud data directly into main state variable using the unique app key
             if (data.strikePlannerState) {
                 state = data.strikePlannerState;
-            } else if (data.state) {
-                state = data.state; // Fallback for legacy format
+                
+                // THE FIX: Only hide the modal if the saved capital is actually greater than 0
+                if (state.startingCapital > 0) {
+                    document.getElementById('init-modal').classList.add('hidden');
+                    runEngine();
+                    renderTabs();
+                    buildSetForm();
+                    switchView('dashboard');
+                } else {
+                    console.log("Poisoned save found (0 capital). Forcing Welcome Screen.");
+                    document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+                }
+                
+            } else {
+                console.log("No Strike Planner data yet. Leaving Welcome Screen open.");
+                document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
             }
-            
-            document.getElementById('init-modal').classList.add('hidden');
-            runEngine();
-            renderTabs();
-            buildSetForm();
-            switchView('dashboard');
         } else {
             console.log("No cloud profile found. Ready for initialization.");
+            document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
         }
     } catch (error) {
         console.error("Error loading cloud data:", error);
