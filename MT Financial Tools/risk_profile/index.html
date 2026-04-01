@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MT Risk Assessment Sandbox v1.6</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        MathJax = {
+            tex: { 
+                inlineMath: [['$', '$'], ['\\(', '\\)']], 
+                displayMath: [['$$', '$$'], ['\\[', '\\]']] 
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Consolas', 'monospace'],
+                    },
+                    colors: {
+                        mtGreen: '#3E8E35',
+                        mtLightBg: '#f8fafc',
+                        mtDarkBg: '#0f172a',
+                        mtLightCard: '#ffffff',
+                        mtDarkCard: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base App Styling - Fixing the Mobile Scroll Trap */
+        body { 
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none; 
+            min-height: 100vh; /* Fallback */
+            min-height: -webkit-fill-available; /* iOS Safari fix */
+        }
+
+        .bg-app {
+            background-color: #f8fafc;
+            background-image: radial-gradient(circle at top right, rgba(226, 232, 240, 0.5), transparent 40%),
+                              radial-gradient(circle at bottom left, rgba(62, 142, 53, 0.03), transparent 40%);
+            transition: background-color 0.3s ease;
+        }
+        
+        .dark .bg-app {
+            background-color: #0f172a;
+            background-image: radial-gradient(circle at top right, rgba(30, 41, 59, 0.5), transparent 40%),
+                              radial-gradient(circle at bottom left, rgba(62, 142, 53, 0.05), transparent 40%);
+        }
+        
+        /* Premium Glass Panels */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .dark .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+        }
+        
+        .number-font { 
+            font-family: 'JetBrains Mono', monospace; 
+        }
+        
+        /* Interactive Form Tiles */
+        .tile-grid { 
+            display: grid; 
+            gap: 0.5rem; 
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); 
+        }
+        
+        .tile-input { 
+            display: none; 
+        }
+        
+        .tile-label {
+            display: flex; 
+            align-items: center; 
+            padding: 0.875rem 1rem; 
+            background-color: rgba(241, 245, 249, 0.8); 
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem; 
+            color: #475569; 
+            font-size: 0.875rem; 
+            font-weight: 500;
+            cursor: pointer; 
+            transition: all 0.2s ease-in-out; 
+            height: 100%;
+        }
+
+        .dark .tile-label {
+            background-color: rgba(30, 41, 59, 0.8);
+            border-color: #334155;
+            color: #94a3b8;
+        }
+        
+        .tile-label:hover { 
+            border-color: #3E8E35; 
+            color: #1e293b; 
+            background-color: rgba(62, 142, 53, 0.05); 
+        }
+
+        .dark .tile-label:hover {
+            color: #e2e8f0;
+            background-color: rgba(62, 142, 53, 0.1);
+        }
+        
+        .tile-input:checked + .tile-label {
+            background-color: rgba(62, 142, 53, 0.1); 
+            border-color: #3E8E35; 
+            color: #0f172a;
+            box-shadow: 0 0 10px rgba(62, 142, 53, 0.1);
+        }
+
+        .dark .tile-input:checked + .tile-label {
+            background-color: rgba(62, 142, 53, 0.2); 
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(62, 142, 53, 0.2);
+        }
+        
+        /* Locked Form State */
+        .locked-form { 
+            pointer-events: none; 
+            opacity: 0.6; 
+        }
+        
+        /* Sliders with Touch Interceptor */
+        .mt-slider { 
+            -webkit-appearance: none; 
+            width: 100%; 
+            height: 6px; 
+            background: #cbd5e1; 
+            border-radius: 4px; 
+            outline: none; 
+            touch-action: pan-y; 
+        }
+
+        .dark .mt-slider { 
+            background: #334155; 
+        }
+        
+        .mt-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; 
+            appearance: none; 
+            width: 24px; 
+            height: 24px; 
+            border-radius: 50%;
+            background: #3E8E35; 
+            cursor: pointer; 
+            border: 2px solid #ffffff; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+
+        .mt-slider:disabled::-webkit-slider-thumb {
+            background: #94a3b8;
+            border-color: #cbd5e1;
+            cursor: not-allowed;
+        }
+
+        .dark .mt-slider:disabled::-webkit-slider-thumb {
+            background: #64748b;
+            border-color: #94a3b8;
+        }
+        
+        /* Currency Inputs */
+        .curr-input {
+            width: 100%; 
+            background-color: rgba(241, 245, 249, 0.8); 
+            border: 1px solid #cbd5e1; 
+            border-radius: 0.5rem;
+            color: #0f172a; 
+            font-family: 'JetBrains Mono', monospace; 
+            padding: 0.875rem 1rem 0.875rem 2.5rem; 
+            outline: none; 
+            transition: all 0.2s;
+        }
+
+        .dark .curr-input {
+            background-color: rgba(30, 41, 59, 0.8);
+            border-color: #334155;
+            color: #ffffff;
+        }
+        
+        .curr-input:focus { 
+            border-color: #3E8E35; 
+            box-shadow: 0 0 0 1px #3E8E35; 
+        }
+
+        /* Bottom Nav Active State */
+        .nav-btn {
+            color: #94a3b8;
+            transition: all 0.2s ease;
+        }
+
+        .nav-btn:hover {
+            color: #475569;
+        }
+
+        .dark .nav-btn:hover {
+            color: #cbd5e1;
+        }
+
+        .nav-btn.active {
+            color: #3E8E35;
+        }
+
+        .nav-btn.active svg {
+            stroke: #3E8E35;
+            fill: rgba(62, 142, 53, 0.15);
+        }
+        
+        /* View Transitions */
+        .view-section {
+            display: none;
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(10px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+
+        /* Tooltips - Elevated z-index */
+        .mt-tooltip-container { 
+            position: relative; 
+            display: inline-flex; 
+            align-items: center; 
+            margin-left: 6px; 
+            cursor: help; 
+        }
+
+        .mt-tooltip-container .mt-tooltip-text {
+            visibility: hidden; 
+            width: 240px; 
+            background-color: #1e293b; 
+            color: #cbd5e1; 
+            text-align: left;
+            border-radius: 6px; 
+            padding: 10px; 
+            font-size: 0.75rem; 
+            font-weight: normal; 
+            font-family: 'Inter', sans-serif;
+            position: absolute; 
+            z-index: 1000; 
+            bottom: 125%; 
+            left: 50%; 
+            transform: translateX(-50%);
+            opacity: 0; 
+            transition: opacity 0.2s; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); 
+            pointer-events: none; 
+            line-height: 1.4;
+        }
+
+        /* Helper class for tooltips strictly on the right edge so they don't overflow the screen */
+        .tooltip-right .mt-tooltip-text {
+            left: auto;
+            right: 0;
+            transform: none;
+        }
+
+        .mt-tooltip-container:hover .mt-tooltip-text { 
+            visibility: visible; 
+            opacity: 1; 
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { 
+            width: 6px; 
+        }
+        ::-webkit-scrollbar-track { 
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb { 
+            background: #cbd5e1; 
+            border-radius: 3px; 
+        }
+        .dark ::-webkit-scrollbar-thumb { 
+            background: #334155; 
+        }
+    </style>
+</head>
+<body class="bg-app text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col relative pb-24">
+
+    <header class="fixed top-0 w-full z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-300">
+        <div class="max-w-[1500px] mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <img src="logo.png" alt="MT Logo" class="h-8 w-auto drop-shadow-sm">
+                <div class="flex flex-col leading-none">
+                    <h1 class="text-[13px] font-bold text-slate-900 dark:text-white tracking-widest uppercase">
+                        Risk Assessment
+                    </h1>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-[10px] text-slate-500 dark:text-slate-400 font-mono tracking-widest">
+                            Sandbox v1.6
+                        </span>
+                        <span id="saveIndicator" class="text-[9px] font-bold text-mtGreen opacity-0 transition-opacity duration-500">
+                            💾 Auto-saved
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button id="btnThemeToggle" class="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors" title="Toggle Theme">
+                    <svg id="iconTheme" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+                </button>
+                
+                <button id="btnResetConfirm" class="p-2 rounded-full bg-red-50 dark:bg-red-900/20 text-red-500 hover:text-red-700 dark:hover:text-red-400 transition-colors hidden" title="Clear Sandbox Data">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow w-full pt-24 pb-32 px-4 sm:px-6 lg:px-8 relative" id="scrollableMain">
+        <div class="max-w-[1500px] mx-auto w-full h-full">
+            
+            <section id="view-assessment" class="view-section active w-full max-w-3xl mx-auto pb-10">
+                <div class="glass-panel p-6 sm:p-8 mb-8">
+                    
+                    <div class="flex justify-between items-center mb-6 border-b border-slate-200 dark:border-slate-700 pb-3">
+                        <h2 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 uppercase tracking-wide">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-mtGreen">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            Risk Profile Setup
+                        </h2>
+                    </div>
+                    
+                    <form id="architectForm" class="space-y-8">
+                        
+                        <div>
+                            <div class="flex justify-between items-end mb-2 gap-4">
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    1. What is your current age? 
+                                    <div class="mt-tooltip-container">
+                                        <span class="text-slate-400 text-xs">ⓘ</span>
+                                        <span class="mt-tooltip-text">Your age determines your mathematical recovery time. The closer you are to retirement, the less time you have to recover from a severe market drop.</span>
+                                    </div>
+                                </label>
+                                <span id="val_age" class="text-2xl font-bold text-mtGreen number-font whitespace-nowrap shrink-0">35</span>
+                            </div>
+                            <input type="range" id="f_age" min="18" max="80" value="35" class="mt-slider mt-input-trigger" oninput="document.getElementById('val_age').textContent = this.value + (this.value == 80 ? '+' : ''); updateTargetAgeSliderMin();">
+                        </div>
+
+                        <div class="p-5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                                2. Do you currently have consumer debt, or a cash emergency fund?
+                                <div class="mt-tooltip-container">
+                                    <span class="text-slate-400 text-xs">ⓘ</span>
+                                    <span class="mt-tooltip-text">The math of investing only works if you aren't bleeding money to interest rates, or forced to sell stocks to pay for a sudden emergency.</span>
+                                </div>
+                            </label>
+                            <div class="tile-grid grid-cols-1">
+                                <label>
+                                    <input type="radio" name="f_prereq" value="cleared" class="tile-input mt-input-trigger" checked>
+                                    <span class="tile-label">I have no debt and a comfortable 3-6 month cash buffer.</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="f_prereq" value="no_ef" class="tile-input mt-input-trigger">
+                                    <span class="tile-label">I have no debt, but I am still building my cash buffer.</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="f_prereq" value="debt" class="tile-input mt-input-trigger">
+                                    <span class="tile-label">I am currently paying off high-interest debt.</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                                3. How much capital are you ready to invest today?
+                                <div class="mt-tooltip-container">
+                                    <span class="text-slate-400 text-xs">ⓘ</span>
+                                    <span class="mt-tooltip-text">Think of this as your starting principal.</span>
+                                </div>
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-3.5 text-slate-400 font-bold text-lg">₱</span>
+                                <input type="text" id="f_capital" class="curr-input text-xl font-bold mt-input-trigger" value="1,000,000" placeholder="0" oninput="formatCurrency(this)">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                                4. How much new money can you consistently add each month?
+                                <div class="mt-tooltip-container">
+                                    <span class="text-slate-400 text-xs">ⓘ</span>
+                                    <span class="mt-tooltip-text">Your savings rate is the most reliable engine for wealth.</span>
+                                </div>
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-3.5 text-slate-400 font-bold text-lg">₱</span>
+                                <input type="text" id="f_velocity" class="curr-input text-xl font-bold mt-input-trigger" value="20,000" placeholder="0" oninput="formatCurrency(this)">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                                5. How predictable is your primary source of income?
+                            </label>
+                            <div class="tile-grid grid-cols-1">
+                                <label>
+                                    <input type="radio" name="f_incStab" value="pension" class="tile-input mt-input-trigger">
+                                    <span class="tile-label">Guaranteed monthly income (e.g., Pension)</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="f_incStab" value="corp" class="tile-input mt-input-trigger" checked>
+                                    <span class="tile-label">Stable monthly salary (e.g., Corporate employment)</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="f_incStab" value="freelance" class="tile-input mt-input-trigger">
+                                    <span class="tile-label">Variable monthly income (e.g., Freelance, Business owner)</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="f_incStab" value="none" class="tile-input mt-input-trigger">
+                                    <span class="tile-label">Unpredictable / Currently transitioning</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div class="flex justify-between items-end mb-2 gap-4">
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    6. Years before you need to start withdrawing this money?
+                                    <div class="mt-tooltip-container">
+                                        <span class="text-slate-400 text-xs">ⓘ</span>
+                                        <span class="mt-tooltip-text">Money needed in under 3 years does not belong in the stock market.</span>
+                                    </div>
+                                </label>
+                                <span id="val_horizon" class="text-2xl font-bold text-mtGreen number-font whitespace-nowrap shrink-0">10 Yrs</span>
+                            </div>
+                            <input type="range" id="f_horizon" min="1" max="20" value="10" class="mt-slider mt-input-trigger" oninput="document.getElementById('val_horizon').textContent = this.value + (this.value == 20 ? '+ Yrs' : ' Yrs')">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                                7. What is your residency status for brokerage accounts?
+                            </label>
+                            <div class="tile-grid grid-cols-1">
+                                <label>
+                                    <input type="radio" name="f_jurisdiction" value="local" class="tile-input mt-input-trigger" checked>
+                                    <span class="tile-label">Philippine-based (I use local SEC-regulated brokers)</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="f_jurisdiction" value="ofw" class="tile-input mt-input-trigger">
+                                    <span class="tile-label">Global / Offshore (OFW/Dual Citizen with access to intl. brokers)</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="f_jurisdiction" value="vpn" class="tile-input mt-input-trigger">
+                                    <span class="tile-label">Philippine-based using international platforms (Unregulated locally)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-300 dark:border-mtGreen/30 shadow-inner space-y-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                                    8. How long have you been actively investing your own money?
+                                </label>
+                                <div class="tile-grid grid-cols-2">
+                                    <label>
+                                        <input type="radio" name="f_scars" value="0" class="tile-input mt-input-trigger">
+                                        <span class="tile-label !justify-center">Less than 1 year</span>
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="f_scars" value="1" class="tile-input mt-input-trigger" checked>
+                                        <span class="tile-label !justify-center">1 to 3 years</span>
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="f_scars" value="3" class="tile-input mt-input-trigger">
+                                        <span class="tile-label !justify-center">3 to 5 years</span>
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="f_scars" value="5" class="tile-input mt-input-trigger">
+                                        <span class="tile-label !justify-center">5+ years</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                                    9. How did you learn the mechanics of investing?
+                                </label>
+                                <div class="tile-grid grid-cols-1">
+                                    <label>
+                                        <input type="radio" name="f_pedigree" value="social" class="tile-input mt-input-trigger">
+                                        <span class="tile-label">Mostly social media, forums, and influencers.</span>
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="f_pedigree" value="reader" class="tile-input mt-input-trigger" checked>
+                                        <span class="tile-label">Self-taught by reading classic financial books.</span>
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="f_pedigree" value="student" class="tile-input mt-input-trigger">
+                                        <span class="tile-label">Graduated from structured, paid local trading programs.</span>
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="f_pedigree" value="pro" class="tile-input mt-input-trigger">
+                                        <span class="tile-label">Hold professional certifications (CFA, CMT, SEC Specialist).</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
+                                10. How much time and emotional energy are you willing to dedicate to the markets?
+                                <div class="mt-tooltip-container">
+                                    <span class="text-slate-400 text-xs">ⓘ</span>
+                                    <span class="mt-tooltip-text">Risk tolerance is what you can stomach losing. We will default to the safer of your math or your emotion.</span>
+                                </div>
+                            </label>
+                            <div class="tile-grid grid-cols-1">
+                                <label>
+                                    <input type="radio" name="f_tolerance" value="A" class="tile-input mt-input-trigger">
+                                    <span class="tile-label border-sky-300 dark:border-sky-500/30">I want zero stress. Put my money in safe, boring assets that generate cash while I sleep.</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="f_tolerance" value="B" class="tile-input mt-input-trigger">
+                                    <span class="tile-label border-lime-300 dark:border-lime-500/30">I want growth, but I prefer a "buy and check monthly" approach without heavy chart monitoring.</span>
+                                </label>
+                                <label>
+                                    <input type="radio" name="f_tolerance" value="C" class="tile-input mt-input-trigger" checked>
+                                    <span class="tile-label border-red-300 dark:border-red-500/30">I have the time, discipline, and emotional control to actively manage high volatility.</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="btnContainer" class="mt-8 pt-4">
+                            <button type="button" id="btnInitiateLock" class="w-full bg-mtGreen hover:bg-emerald-600 text-white font-bold py-4 px-4 rounded-xl shadow-lg shadow-mtGreen/20 transition-all uppercase tracking-widest text-lg">
+                                Execute Analysis
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+            </section>
+
+            <section id="view-dashboard" class="view-section w-full pb-10">
+                
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6" id="exportTarget">
+                    
+                    <div class="xl:col-span-5 flex flex-col gap-6" id="dashboardLeftCol">
+                        
+                        <div class="flex justify-end gap-3 w-full">
+                            <button id="btnOpenSettings" class="px-4 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-500 hover:border-blue-500 dark:hover:text-blue-400 dark:hover:border-blue-500 transition-colors text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                </svg>
+                                Advanced Yields
+                            </button>
+                            <button id="btnExport" class="px-4 py-2 rounded-lg bg-mtGreen border border-mtGreen text-white hover:bg-emerald-600 transition-colors text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm hidden">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Export Report
+                            </button>
+                        </div>
+
+                        <div id="exportTarget" class="flex flex-col gap-6 w-full">
+                            
+                            <div id="outScamAlert" class="hidden bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 border-l-4 border-l-amber-500 p-4 rounded-xl shadow-sm">
+                                <div class="flex items-start">
+                                    <span class="text-xl mr-3">⚠️</span>
+                                    <div>
+                                        <h3 class="text-amber-800 dark:text-amber-400 font-bold text-xs uppercase tracking-widest mb-1">
+                                            Sustainability Alert
+                                        </h3>
+                                        <p id="outScamAlertText" class="text-amber-900 dark:text-amber-200 text-sm leading-relaxed">
+                                            Your monthly addition is extremely high compared to your starting capital. Ensure this savings rate is mathematically sustainable in real life.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="outFailsafe" class="hidden bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 border-l-4 border-l-red-500 p-4 rounded-xl shadow-sm">
+                                <div class="flex items-start">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500 mr-3 mt-1 shrink-0">
+                                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                    <div>
+                                        <h3 class="text-red-700 dark:text-red-400 font-bold text-xs uppercase tracking-widest mb-1">
+                                            Foundation Alert
+                                        </h3>
+                                        <p id="outFailsafeText" class="text-red-900 dark:text-red-200 text-sm leading-relaxed">...</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="glass-panel p-6" id="cardIdentity">
+                                <div class="flex justify-between items-start mb-6 border-b border-slate-200 dark:border-slate-700 pb-4">
+                                    <div>
+                                        <h2 class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mb-1 flex items-center gap-1.5">
+                                            Suggested Risk Level
+                                            <div class="mt-tooltip-container">
+                                                <span class="text-slate-400 text-[9px] hover:text-mtGreen">ⓘ</span>
+                                                <span class="mt-tooltip-text normal-case tracking-normal">Your structurally assigned risk profile based on your age, timeline, and financial foundation.</span>
+                                            </div>
+                                        </h2>
+                                        <h3 id="outProfile" class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                                            Awaiting Execution
+                                        </h3>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mb-1 flex items-center justify-end gap-1.5 tooltip-right">
+                                            <div class="mt-tooltip-container">
+                                                <span class="text-slate-400 text-[9px] hover:text-mtGreen">ⓘ</span>
+                                                <span class="mt-tooltip-text normal-case tracking-normal">A raw score out of 100 measuring your mathematical ability to absorb market crashes.</span>
+                                            </div>
+                                            Risk Score
+                                        </span>
+                                        <span id="outScore" class="text-2xl sm:text-3xl font-bold text-mtGreen number-font block">
+                                            --/100
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div id="thermostatContainer" class="bg-slate-50 dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hidden mb-6 shadow-inner">
+                                    <div class="flex justify-between items-center mb-4">
+                                        <label class="flex items-center gap-1.5 text-[11px] text-slate-700 dark:text-slate-300 uppercase tracking-wider font-bold">
+                                            Adjust Risk Tolerance 
+                                            <div class="mt-tooltip-container">
+                                                <span class="text-slate-400 text-[9px] hover:text-mtGreen">ⓘ</span>
+                                                <span class="mt-tooltip-text normal-case tracking-normal">Downgrade your risk exposure if you prefer less volatility. You cannot exceed your mathematical capacity.</span>
+                                            </div>
+                                        </label>
+                                        <span id="thermostatLabel" class="text-[10px] font-bold text-mtGreen uppercase tracking-wide px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30">
+                                            MAX ALLOWED
+                                        </span>
+                                    </div>
+                                    <input type="range" id="riskThermostat" min="1" max="5" step="1" value="5" class="mt-slider w-full" oninput="handleThermostatChange()">
+                                    <div class="flex justify-between text-[10px] text-slate-500 mt-2 uppercase font-bold tracking-wider">
+                                        <span class="text-sky-600 dark:text-sky-400">1 (Safe)</span>
+                                        <span id="thermostatMaxLabel" class="text-red-500 dark:text-red-400">5 (Max)</span>
+                                    </div>
+                                </div>
+
+                                <div class="h-[150px] flex flex-col justify-center border-l-2 border-mtGreen pl-4 w-full overflow-hidden">
+                                    <p id="outNarrative" class="text-slate-600 dark:text-slate-300 text-sm leading-relaxed italic w-full">
+                                        Run assessment to generate structural narrative.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                
+                                <div class="glass-panel p-5 relative group">
+                                    <div class="absolute inset-0 bg-emerald-500/5 transition-colors group-hover:bg-emerald-500/10 rounded-[1rem]"></div>
+                                    <div class="relative z-10">
+                                        <span class="block text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
+                                            Projected Cash Flow
+                                            <div class="mt-tooltip-container">
+                                                <span class="text-slate-400 text-[9px] hover:text-emerald-500">ⓘ</span>
+                                                <span class="mt-tooltip-text normal-case tracking-normal">Estimated dividends and interest paid directly to your account entirely separate from stock price movement.</span>
+                                            </div>
+                                        </span>
+                                        <span id="outYield" class="text-lg font-bold text-slate-900 dark:text-white number-font">
+                                            ₱0 / yr
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div class="glass-panel p-5 relative group">
+                                    <div class="absolute inset-0 bg-blue-500/5 transition-colors group-hover:bg-blue-500/10 rounded-[1rem]"></div>
+                                    <div class="relative z-10">
+                                        <span class="block text-[10px] text-blue-600 dark:text-blue-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
+                                            Projected Growth Rate
+                                            <div class="mt-tooltip-container">
+                                                <span class="text-slate-400 text-[9px] hover:text-blue-500">ⓘ</span>
+                                                <span class="mt-tooltip-text normal-case tracking-normal">Combined Yield + Long-Term Capital Appreciation. Represents the total compound growth rate of your blueprint.</span>
+                                            </div>
+                                        </span>
+                                        <span id="outCAGR" class="text-lg font-bold text-slate-900 dark:text-white number-font">
+                                            0.0% CAGR
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="glass-panel p-5 relative group">
+                                    <div class="absolute inset-0 bg-amber-500/5 transition-colors group-hover:bg-amber-500/10 rounded-[1rem]"></div>
+                                    <div class="relative z-10">
+                                        <span class="block text-[10px] text-amber-600 dark:text-amber-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
+                                            Total Out of Pocket
+                                            <div class="mt-tooltip-container">
+                                                <span class="text-slate-400 text-[9px] hover:text-amber-500">ⓘ</span>
+                                                <span class="mt-tooltip-text normal-case tracking-normal">The raw cash you saved (Starting Capital + all Monthly Additions up to Target Age).</span>
+                                            </div>
+                                        </span>
+                                        <span id="outPocket" class="text-lg font-bold text-slate-900 dark:text-white number-font">
+                                            ₱0
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="glass-panel p-5 relative group">
+                                    <div class="absolute inset-0 bg-purple-500/5 transition-colors group-hover:bg-purple-500/10 rounded-[1rem]"></div>
+                                    <div class="relative z-10">
+                                        <span class="block text-[10px] text-purple-600 dark:text-purple-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
+                                            Earned via Compounding
+                                            <div class="mt-tooltip-container">
+                                                <span class="text-slate-400 text-[9px] hover:text-purple-500">ⓘ</span>
+                                                <span class="mt-tooltip-text normal-case tracking-normal">The "Free Money" generated entirely by your portfolio's growth over time.</span>
+                                            </div>
+                                        </span>
+                                        <span id="outEarned" class="text-lg font-bold text-mtGreen number-font">
+                                            ₱0
+                                        </span>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div> 
+                        </div>
+
+                    <div class="xl:col-span-7 flex flex-col gap-6">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="exportCharts">
+                            <div class="glass-panel p-5 flex flex-col">
+                                <h4 class="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mb-4 flex items-center gap-2 tooltip-right">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="3" y1="9" x2="21" y2="9"></line>
+                                        <line x1="9" y1="21" x2="9" y2="9"></line>
+                                    </svg>
+                                    Asset Allocation
+                                    <div class="mt-tooltip-container ml-auto">
+                                        <span class="text-slate-400 text-[9px] hover:text-mtGreen">ⓘ</span>
+                                        <span class="mt-tooltip-text normal-case tracking-normal">Your total capital split between absolute safety (Cash/Bonds) and growth (Equities).</span>
+                                    </div>
+                                </h4>
+                                <div class="relative w-full h-48 mb-4 flex justify-center">
+                                    <canvas id="macroChart"></canvas>
+                                </div>
+                                <div id="macroLegend" class="w-full space-y-2 mt-auto"></div>
+                            </div>
+                            <div class="glass-panel p-5 flex flex-col">
+                                <h4 class="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mb-4 flex items-center gap-2 tooltip-right">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+                                        <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+                                    </svg>
+                                    Stock Selection
+                                    <div class="mt-tooltip-container ml-auto">
+                                        <span class="text-slate-400 text-[9px] hover:text-mtGreen">ⓘ</span>
+                                        <span class="mt-tooltip-text normal-case tracking-normal">How your growth capital is divided across specific stock classifications.</span>
+                                    </div>
+                                </h4>
+                                <div class="relative w-full h-48 mb-4 flex justify-center">
+                                    <canvas id="microChart"></canvas>
+                                </div>
+                                <div id="microLegend" class="w-full space-y-2 mt-auto"></div>
+                            </div>
+                        </div>
+
+                        <div class="glass-panel p-5">
+                            <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4 border-b border-slate-200 dark:border-slate-700 pb-4">
+                                <div>
+                                    <h4 class="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
+                                        Wealth Projection
+                                    </h4>
+                                    <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                                        Simulating static top-ups to Target Age.
+                                    </p>
+                                </div>
+                                
+                                <div class="flex flex-wrap items-center gap-3 bg-slate-50 dark:bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-[10px] uppercase font-bold w-full xl:w-auto relative z-20">
+                                    
+                                    <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 cursor-pointer hover:text-mtGreen transition-colors">
+                                        <input type="checkbox" id="toggleLog" class="rounded border-slate-300 dark:border-slate-600 text-mtGreen focus:ring-mtGreen w-3 h-3" onchange="updateProjectionView()">
+                                        Log Scale
+                                    </label>
+                                    
+                                    <div class="w-px h-4 bg-slate-300 dark:bg-slate-600 hidden sm:block"></div>
+                                    
+                                    <label class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 cursor-pointer hover:text-mtGreen transition-colors">
+                                        <input type="checkbox" id="toggleRealWealth" class="rounded border-slate-300 dark:border-slate-600 text-mtGreen focus:ring-mtGreen w-3 h-3" onchange="updateProjectionView()">
+                                        Real Wealth
+                                        <div class="mt-tooltip-container">
+                                            <span class="text-slate-400 text-[9px] hover:text-mtGreen">ⓘ</span>
+                                            <span class="mt-tooltip-text normal-case tracking-normal">Nominal shows the raw peso amount. Real Wealth adjusts the chart downwards by subtracting 4% annual inflation, showing you what your money will ACTUALLY buy in the future.</span>
+                                        </div>
+                                    </label>
+
+                                    <div class="w-px h-4 bg-slate-300 dark:bg-slate-600 hidden sm:block"></div>
+
+                                    <div class="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                                        <span class="text-slate-500">Age: <span id="val_targetAge" class="text-mtGreen number-font text-xs">65</span></span>
+                                        <input type="range" id="f_targetAge" min="23" max="90" value="65" class="mt-slider w-full sm:w-20" oninput="document.getElementById('val_targetAge').textContent = this.value; updateProjectionView();">
+                                    </div>
+
+                                </div>
+                            </div>
+                            <div class="relative w-full min-h-[300px]">
+                                <canvas id="projectionChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="glass-panel p-5" id="exportPlaybook">
+                            <h4 class="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                                </svg>
+                                Action Plan
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div class="bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-emerald-500 p-4 rounded shadow-sm">
+                                    <span class="block text-emerald-700 dark:text-emerald-400 font-bold mb-2 uppercase text-[10px] tracking-wider">Strategy Focus</span>
+                                    <p id="outFocus" class="text-slate-700 dark:text-slate-300 text-xs leading-relaxed">...</p>
+                                </div>
+                                <div class="bg-amber-50 dark:bg-amber-900/10 border-l-4 border-amber-500 p-4 rounded shadow-sm">
+                                    <span class="block text-amber-700 dark:text-amber-400 font-bold mb-2 uppercase text-[10px] tracking-wider">Tactics / Selective</span>
+                                    <p id="outSelective" class="text-slate-700 dark:text-slate-300 text-xs leading-relaxed">...</p>
+                                </div>
+                                <div class="bg-red-50 dark:bg-red-900/10 border-l-4 border-red-500 p-4 rounded shadow-sm">
+                                    <span class="block text-red-700 dark:text-red-400 font-bold mb-2 uppercase text-[10px] tracking-wider">Strictly Avoid</span>
+                                    <p id="outAvoid" class="text-slate-700 dark:text-slate-300 text-xs leading-relaxed">...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-guidebook" class="view-section w-full max-w-4xl mx-auto pb-10">
+                <div class="glass-panel p-6 sm:p-10">
+                    
+                    <div class="text-center mb-10 border-b border-slate-200 dark:border-slate-700 pb-8">
+                        <h2 class="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-3">The Guidebook</h2>
+                        <p class="text-slate-500 dark:text-slate-400">Master your portfolio, understand the mechanics, and grow your wealth.</p>
+                    </div>
+                    
+                    <div class="space-y-12 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                        
+                        <section>
+                            <h3 class="text-mtGreen font-bold text-sm mb-4 uppercase tracking-widest border-b border-slate-200 dark:border-slate-800 pb-2">
+                                Part 1: The Math of Your Life
+                            </h3>
+                            <p>Investing is not about predicting the future, and it is certainly not about how brave you feel. It is about understanding the mathematical reality of your current life.</p>
+                            <p class="mt-2">The stock market is inherently volatile. At some point, your portfolio will experience a severe drop. Before you invest a single peso, we have to answer one vital question: <strong>If the market crashes tomorrow, will your real-life financial obligations force you to sell your investments at a loss?</strong></p>
+                            <p class="mt-2">To answer this, we calculate your <strong>Structural Capacity</strong>. By looking at your age, your emergency cash, your income stability, and your time horizon, we determine exactly how much market volatility your life can safely absorb.</p>
+                            
+                            <div class="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700 mt-8 mb-8 text-center shadow-sm">
+                                <p class="font-bold text-slate-900 dark:text-white mb-2 text-left uppercase tracking-wider text-[11px]">
+                                    The Core Compounding Principle
+                                </p>
+                                <p class="text-left text-xs text-slate-500 dark:text-slate-400 mb-4">
+                                    Once your capacity is calculated, control shifts to your discipline. Wealth is built through a universal formula:
+                                </p>
+                                <div class="text-2xl my-8 overflow-x-auto text-mtGreen flex justify-center">
+                                    $$Equity_n = Equity_0 \times (1 + r)^n$$
+                                </div>
+                                <ul class="text-left text-xs text-slate-600 dark:text-slate-300 space-y-3 bg-white dark:bg-slate-900/50 p-5 rounded-lg border border-slate-100 dark:border-slate-800">
+                                    <li class="flex items-start gap-2">
+                                        <strong class="text-slate-900 dark:text-white shrink-0">$Equity_0$</strong> 
+                                        <span>= Your starting capital (plus your consistent monthly additions).</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <strong class="text-slate-900 dark:text-white shrink-0">$r$</strong> 
+                                        <span>= Your average annual rate of return.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <strong class="text-slate-900 dark:text-white shrink-0">$n$</strong> 
+                                        <span>= Time (number of years your money remains invested).</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <p>Notice that time ($n$) is the exponent—it is the most powerful variable in the equation. To let time do its work, you must be in a portfolio that you can comfortably hold for decades without losing sleep. That is why we provide a <strong>Risk Thermostat</strong> on your dashboard. While the system calculates your maximum mathematical capacity, you can always use the thermostat to safely dial down your risk to match your emotional comfort level.</p>
+                        </section>
+
+                        <section>
+                            <h3 class="text-mtGreen font-bold text-sm mb-4 uppercase tracking-widest border-b border-slate-200 dark:border-slate-800 pb-2">
+                                Part 2: Personal Risk Profile Assessment
+                            </h3>
+                            <p class="mb-4">Based on your inputs, the system assigns you to one of five structural profiles. Each profile dictates exactly how your capital should be divided between absolute safety (Cash/Bonds) and growth (Equities).</p>
+                            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-transparent">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-[10px] uppercase tracking-widest">
+                                            <th class="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Your Risk Profile</th>
+                                            <th class="p-4 font-bold border-l border-b border-slate-200 dark:border-slate-700">Investment Objective</th>
+                                            <th class="p-4 font-bold border-l border-b border-slate-200 dark:border-slate-700">Where to Invest</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-xs sm:text-sm">
+                                        <tr class="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                            <td class="p-4 font-bold text-sky-600 dark:text-sky-400 border-r border-slate-100 dark:border-slate-700/50">Capital Preservation</td>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 text-slate-600 dark:text-slate-300">Total Preservation (Beat inflation)</td>
+                                            <td class="p-4 text-slate-600 dark:text-slate-300">Cash, Fixed Income, MP2</td>
+                                        </tr>
+                                        <tr class="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                            <td class="p-4 font-bold text-emerald-600 dark:text-emerald-400 border-r border-slate-100 dark:border-slate-700/50">Conservative Income</td>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 text-slate-600 dark:text-slate-300">Preservation with some growth</td>
+                                            <td class="p-4 text-slate-600 dark:text-slate-300">Dividend Stocks with Blue Chips</td>
+                                        </tr>
+                                        <tr class="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                            <td class="p-4 font-bold text-lime-600 dark:text-lime-400 border-r border-slate-100 dark:border-slate-700/50">Balanced Growth</td>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 text-slate-600 dark:text-slate-300">Income and growth (50/50)</td>
+                                            <td class="p-4 text-slate-600 dark:text-slate-300">Dividend Stocks with Blue Chips (50/50)</td>
+                                        </tr>
+                                        <tr class="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                            <td class="p-4 font-bold text-amber-600 dark:text-amber-400 border-r border-slate-100 dark:border-slate-700/50">Aggressive Growth</td>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 text-slate-600 dark:text-slate-300">Growth focused</td>
+                                            <td class="p-4 text-slate-600 dark:text-slate-300">Blue Chips and Second Liners</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                            <td class="p-4 font-bold text-red-600 dark:text-red-400 border-r border-slate-100 dark:border-slate-700/50">Speculative Growth</td>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 text-slate-600 dark:text-slate-300">Maximum Growth (Tactical)</td>
+                                            <td class="p-4 text-slate-600 dark:text-slate-300">Second and Third Liners, Crypto</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section>
+                            <h3 class="text-mtGreen font-bold text-sm mb-4 uppercase tracking-widest border-b border-slate-200 dark:border-slate-800 pb-2">
+                                Part 3: Stock Classification Cheat Sheet (PSE)
+                            </h3>
+                            <p class="mb-4">When the system assigns specific equity classes, here is what those buckets look like in the Philippine Stock Exchange:</p>
+                            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-transparent">
+                                <table class="w-full text-left border-collapse min-w-[600px]">
+                                    <thead>
+                                        <tr class="bg-slate-50 dark:bg-slate-800 text-[10px] uppercase tracking-widest">
+                                            <th class="p-4 font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-700 w-1/4">Dividend Stocks</th>
+                                            <th class="p-4 font-bold border-l border-b border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 w-1/4">Blue Chips</th>
+                                            <th class="p-4 font-bold border-l border-b border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-400 w-1/4">Second Liners</th>
+                                            <th class="p-4 font-bold border-l border-b border-slate-200 dark:border-slate-700 text-red-600 dark:text-red-400 w-1/4">Third Liners</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-slate-600 dark:text-slate-300 text-xs align-top">
+                                        <tr>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 leading-relaxed bg-emerald-50/50 dark:bg-emerald-900/5">
+                                                <strong class="text-slate-900 dark:text-white block mb-2 border-b border-emerald-200 dark:border-emerald-500/30 pb-1">All REITs</strong> 
+                                                LTG, GMA7, TEL, MBT, OGP, SHNG, DMC, SCC, MWC, EW, AP, PNB, PGOLD, SGP, RFM, GLO <br><br>
+                                                <em class="text-emerald-700 dark:text-emerald-400">Preferred Shares</em>
+                                            </td>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 leading-relaxed bg-blue-50/50 dark:bg-blue-900/5">
+                                                SMPH, SM, TEL, BDO, ALI, MONDE, JFC, AEV, CNVRG, ACEN, SCC, LTG, BPI, JGS, GTCAP, PGOLD, DMC, SMC, MER, GLO, EMI, AC, CNPF, ICT, URC, MBT, AREIT, CBC, PLUS, RCR
+                                            </td>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 leading-relaxed bg-amber-50/50 dark:bg-amber-900/5">
+                                                MYNLD, APX, MEG, RLC, UBP, AGI, PCOR, BLOOM, RRHI, SECB, MWC, FGEN, PAL, SGP, DNL, FDC, SEVN, HOUSE, RCB, DITO, GMA7, MREIT, COSCO, TFHI, GSMI, PNB, FPH, ATI, DELM, SLI, SHLPH, HLCM, PSB, CEB, CNPF, FLI, VLL, AUB, WLCON, NIKL, AP
+                                            </td>
+                                            <td class="p-4 leading-relaxed text-[11px] bg-red-50/50 dark:bg-red-900/5">
+                                                KEEPR, PX, PXP, VVT, 2GO, DD, PLC, COL, EW, SPC, AT, PSE, LPZ, FEU, CHI, FNI, PIZZA, PNX, SHNG, BEL, SPNEC, BNCOM, IMI, APL, GERI, AXLM... <br><br><span class="text-red-600 dark:text-red-400/80 italic font-semibold">(Highly volatile momentum plays)</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section>
+                            <h3 class="text-mtGreen font-bold text-sm mb-4 uppercase tracking-widest border-b border-slate-200 dark:border-slate-800 pb-2">
+                                Part 4: Strategies For Each Class
+                            </h3>
+                            <p class="mb-4">Your strategy must match the assets you hold. A 65-year-old in Dividend Stocks is an <strong>Investor</strong> looking at financial statements. A 21-year-old in Third Liners is a <strong>Trader</strong> looking at technical charts.</p>
+                            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-transparent">
+                                <table class="w-full text-left border-collapse min-w-[600px]">
+                                    <thead>
+                                        <tr class="bg-slate-50 dark:bg-slate-800 text-[10px] uppercase tracking-widest">
+                                            <th class="p-4 font-bold text-emerald-600 dark:text-emerald-400 border-b border-slate-200 dark:border-slate-700 w-1/4">Dividend Stocks</th>
+                                            <th class="p-4 font-bold border-l border-b border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 w-1/4">Blue Chips</th>
+                                            <th class="p-4 font-bold border-l border-b border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-400 w-1/4">Second Liners</th>
+                                            <th class="p-4 font-bold border-l border-b border-slate-200 dark:border-slate-700 text-red-600 dark:text-red-400 w-1/4">Third Liners</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-slate-600 dark:text-slate-300 text-xs sm:text-sm align-top">
+                                        <tr>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 space-y-3 bg-emerald-50/50 dark:bg-emerald-900/5">
+                                                <p class="flex items-start gap-2"><span class="text-emerald-500 font-bold">•</span> Buy and hold</p>
+                                                <p class="flex items-start gap-2"><span class="text-emerald-500 font-bold">•</span> Peso cost averaging</p>
+                                                <p class="flex items-start gap-2"><span class="text-emerald-500 font-bold">•</span> Buy on Dips</p>
+                                                <div class="mt-4 p-3 bg-emerald-100 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-500/30 rounded text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
+                                                    Accumulate heavily if dividend yield is above bank interest rates.
+                                                </div>
+                                            </td>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 space-y-3 bg-blue-50/50 dark:bg-blue-900/5">
+                                                <p class="flex items-start gap-2"><span class="text-blue-500 font-bold">•</span> Buy and hold</p>
+                                                <p class="flex items-start gap-2"><span class="text-blue-500 font-bold">•</span> Peso Cost averaging</p>
+                                                <p class="flex items-start gap-2"><span class="text-blue-500 font-bold">•</span> Buy on dips</p>
+                                                <p class="flex items-start gap-2"><span class="text-blue-500 font-bold">•</span> Position trading</p>
+                                                <p class="flex items-start gap-2"><span class="text-blue-500 font-bold">•</span> Swing</p>
+                                                <p class="flex items-start gap-2"><span class="text-blue-500 font-bold">•</span> Bounce</p>
+                                            </td>
+                                            <td class="p-4 border-r border-slate-100 dark:border-slate-700/50 space-y-3 bg-amber-50/50 dark:bg-amber-900/5">
+                                                <p class="flex items-start gap-2"><span class="text-amber-500 font-bold">•</span> Position</p>
+                                                <p class="flex items-start gap-2"><span class="text-amber-500 font-bold">•</span> Swing</p>
+                                                <p class="flex items-start gap-2"><span class="text-amber-500 font-bold">•</span> Breakout</p>
+                                                <p class="flex items-start gap-2"><span class="text-amber-500 font-bold">•</span> Bounce</p>
+                                                <p class="flex items-start gap-2"><span class="text-amber-500 font-bold">•</span> Day Trading</p>
+                                                <div class="mt-4 p-3 bg-amber-100 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-500/30 rounded text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                                                    Requires Technical Analysis and strict stop-losses.
+                                                </div>
+                                            </td>
+                                            <td class="p-4 space-y-3 bg-red-50/50 dark:bg-red-900/5">
+                                                <p class="flex items-start gap-2"><span class="text-red-500 font-bold">•</span> Position</p>
+                                                <p class="flex items-start gap-2"><span class="text-red-500 font-bold">•</span> Swing</p>
+                                                <p class="flex items-start gap-2"><span class="text-red-500 font-bold">•</span> Breakout</p>
+                                                <p class="flex items-start gap-2"><span class="text-red-500 font-bold">•</span> Bounce</p>
+                                                <p class="flex items-start gap-2"><span class="text-red-500 font-bold">•</span> Day Trading</p>
+                                                <div class="mt-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-500/30 rounded text-[11px] text-red-800 dark:text-red-300 font-medium">
+                                                    Maximum volatility. Strict risk management required.
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                        
+                        <section>
+                            <h3 class="text-mtGreen font-bold text-sm mb-4 uppercase tracking-widest border-b border-slate-200 dark:border-slate-800 pb-2">
+                                Frequently Asked Questions
+                            </h3>
+                            <div class="space-y-6">
+                                <div class="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                                    <strong class="text-slate-900 dark:text-white block mb-2 font-bold text-sm">
+                                        Q: Why did the system assign me a "Conservative" profile when I want to invest aggressively?
+                                    </strong>
+                                    <p class="text-xs sm:text-sm">Because there is a massive difference between <em>Risk Tolerance</em> (how brave you feel) and <em>Risk Capacity</em> (how much money you can afford to lose). If you are 60 years old and retiring soon, or need the money in 2 years, your capacity to recover from a crash is near zero. The system restricts you to protect your principal.</p>
+                                </div>
+                                <div class="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                                    <strong class="text-slate-900 dark:text-white block mb-2 font-bold text-sm">
+                                        Q: Why can I lower my risk on the Thermostat, but I can't raise it?
+                                    </strong>
+                                    <p class="text-xs sm:text-sm">Think of the assignment as a structural speed limit. You can safely drive up to it. However, if you prefer less stress, you are allowed to drive slower. Emotion should be allowed to <em>downgrade</em> your risk for peace of mind, but it should never allow you to take <em>more</em> risk than your finances support.</p>
+                                </div>
+                                <div class="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                                    <strong class="text-slate-900 dark:text-white block mb-2 font-bold text-sm">
+                                        Q: I have 5 years of experience, but it locked me out of "Third Liners". Why?
+                                    </strong>
+                                    <p class="text-xs sm:text-sm">Experience only unlocks speculative assets <em>if</em> your foundation allows for it. If you have 5 years experience but a 3-year time horizon, experience cannot save you from a sudden crash. Speculation requires both skill (Mastery) and the financial safety net to absorb total loss (Capacity).</p>
+                                </div>
+                                <div class="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                                    <strong class="text-slate-900 dark:text-white block mb-2 font-bold text-sm">
+                                        Q: The chart assumes my top-up is static for 40 years. Won't income go up?
+                                    </strong>
+                                    <p class="text-xs sm:text-sm">Yes, ideally. But human behavior shows "lifestyle creep" often consumes raises. We keep it static to brutally demonstrate that if you do not actively increase your savings rate over time, 4% inflation will eventually eat your contributions alive.</p>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 w-full z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] transition-colors duration-300">
+        <div class="max-w-[1500px] mx-auto px-2 flex justify-around items-center h-16 pb-[env(safe-area-inset-bottom)]">
+            
+            <button onclick="Painter.switchView('view-assessment', this)" class="nav-btn active flex flex-col items-center justify-center w-full h-full pt-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1 transition-all">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <span class="text-[10px] font-bold tracking-wider uppercase">Assessment</span>
+            </button>
+            
+            <button id="navDashboard" onclick="Painter.switchView('view-dashboard', this)" class="nav-btn flex flex-col items-center justify-center w-full h-full pt-1" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1 transition-all">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                    <line x1="9" y1="21" x2="9" y2="9"></line>
+                </svg>
+                <span class="text-[10px] font-bold tracking-wider uppercase">Dashboard</span>
+            </button>
+            
+            <button onclick="Painter.switchView('view-guidebook', this)" class="nav-btn flex flex-col items-center justify-center w-full h-full pt-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1 transition-all">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                <span class="text-[10px] font-bold tracking-wider uppercase">Guidebook</span>
+            </button>
+            
+        </div>
+    </nav>
+
+    <div id="welcomeModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 transition-opacity duration-300">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="glass-panel w-full max-w-md z-10 p-8 text-center relative shadow-2xl border-mtGreen/30">
+            <img src="logo.png" alt="MT Logo" class="w-20 h-20 mx-auto mb-6 drop-shadow-lg object-contain">
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-3">Welcome to your Risk Assessment</h2>
+            <p class="text-sm text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
+                This tool evaluates your financial foundation to recommend a safe, personalized investment strategy and projects your wealth over time.
+            </p>
+            <button id="btnDismissWelcome" class="w-full px-4 py-4 bg-mtGreen text-white font-bold rounded-xl hover:bg-emerald-600 transition shadow-lg shadow-mtGreen/20 uppercase tracking-widest text-sm">
+                Begin Assessment
+            </button>
+        </div>
+    </div>
+
+    <div id="resetModal" class="fixed inset-0 z-50 items-center justify-center p-4" style="display: none;">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="document.getElementById('resetModal').style.display='none'"></div>
+        <div class="glass-panel w-full max-w-sm z-10 p-6 text-center relative shadow-2xl border-red-500/30">
+            <div class="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 mx-auto flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                </svg>
+            </div>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-2">Clear Sandbox Data?</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                This will wipe your current assessment, projection data, and all local storage. This action cannot be undone.
+            </p>
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('resetModal').style.display='none'" class="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                    Cancel
+                </button>
+                <button id="btnConfirmReset" class="flex-1 px-4 py-2 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition shadow-lg shadow-red-500/20">
+                    Yes, Clear Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="fixed inset-0 z-50 items-center justify-center p-4" style="display: none;">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="document.getElementById('settingsModal').style.display='none'"></div>
+        <div class="glass-panel w-full max-w-md z-10 p-6 relative shadow-2xl">
+            
+            <div class="flex justify-between items-center mb-6 border-b border-slate-200 dark:border-slate-700 pb-3">
+                <h2 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500">
+                        <path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"></path>
+                        <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"></path>
+                        <path d="M12 2v2"></path>
+                        <path d="M12 20v2"></path>
+                        <path d="m4.93 4.93 1.41 1.41"></path>
+                        <path d="m17.66 17.66 1.41 1.41"></path>
+                        <path d="M2 12h2"></path>
+                        <path d="M20 12h2"></path>
+                        <path d="m6.34 17.66-1.41 1.41"></path>
+                        <path d="m19.07 4.93-1.41 1.41"></path>
+                    </svg>
+                    Advanced Yield Settings
+                </h2>
+                <button onclick="document.getElementById('settingsModal').style.display='none'" class="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                Adjust the assumed compounded annual growth rate (CAGR) for each asset class. This directly alters the Expected Trajectory and Probability Cone.
+            </p>
+            
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Cash / HYSA Yield</label>
+                    <div class="relative w-24">
+                        <input type="number" id="y_cash" min="-100" max="500" class="curr-input text-right !pr-6 !pl-2" value="2.8" step="0.1">
+                        <span class="absolute right-3 top-3.5 text-slate-400 font-bold text-xs">%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Fixed Income / MP2</label>
+                    <div class="relative w-24">
+                        <input type="number" id="y_fixed" min="-100" max="500" class="curr-input text-right !pr-6 !pl-2" value="6.5" step="0.1">
+                        <span class="absolute right-3 top-3.5 text-slate-400 font-bold text-xs">%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Dividend Stocks (REITs)</label>
+                    <div class="relative w-24">
+                        <input type="number" id="y_reit" min="-100" max="500" class="curr-input text-right !pr-6 !pl-2" value="8.0" step="0.1">
+                        <span class="absolute right-3 top-3.5 text-slate-400 font-bold text-xs">%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Blue Chips</label>
+                    <div class="relative w-24">
+                        <input type="number" id="y_blue" min="-100" max="500" class="curr-input text-right !pr-6 !pl-2" value="10.0" step="0.1">
+                        <span class="absolute right-3 top-3.5 text-slate-400 font-bold text-xs">%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Second Liners</label>
+                    <div class="relative w-24">
+                        <input type="number" id="y_second" min="-100" max="500" class="curr-input text-right !pr-6 !pl-2" value="12.0" step="0.1">
+                        <span class="absolute right-3 top-3.5 text-slate-400 font-bold text-xs">%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Third Liners</label>
+                    <div class="relative w-24">
+                        <input type="number" id="y_third" min="-100" max="500" class="curr-input text-right !pr-6 !pl-2" value="15.0" step="0.1">
+                        <span class="absolute right-3 top-3.5 text-slate-400 font-bold text-xs">%</span>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Crypto Majors</label>
+                    <div class="relative w-24">
+                        <input type="number" id="y_crypto" min="-100" max="500" class="curr-input text-right !pr-6 !pl-2" value="20.0" step="0.1">
+                        <span class="absolute right-3 top-3.5 text-slate-400 font-bold text-xs">%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-4 border-t border-slate-200 dark:border-slate-700 flex gap-3">
+                <button onclick="document.getElementById('settingsModal').style.display='none'" class="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition text-sm">
+                    Cancel
+                </button>
+                <button id="btnSaveSettings" class="flex-1 px-4 py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 transition shadow-lg shadow-blue-500/20 text-sm tracking-wide">
+                    Apply Yields
+                </button>
+            </div>
+
+        </div>
+    </div>
+<script type="module" src="engine.js"></script>
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MT Strike Planner v1.8</title>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'], 
+                        mono: ['JetBrains Mono', 'monospace'] 
+                    },
+                    colors: { 
+                        brand: '#3E8E35', 
+                        slate: { 850: '#151e2e', 900: '#0f172a' } 
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { overflow-y: scroll; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .bg-wave { position: fixed; inset: 0; z-index: -1; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%233E8E35' fill-opacity='0.05' d='M0,288L48,272C96,256,192,224,288,197.3C384,171,480,149,576,165.3C672,181,768,224,864,224C960,224,1056,181,1152,149.3C1248,117,1344,96,1392,85.3L1440,75L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E"); background-size: cover; background-position: bottom; background-repeat: no-repeat; transition: opacity 0.3s; }
+        .glass-panel { background: rgba(255, 255, 255, 0.85); border: 1px solid #cbd5e1; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); backdrop-filter: blur(12px); transition: background-color 0.3s, border-color 0.3s; }
+        .dark .glass-panel { background: rgba(30, 41, 59, 0.75); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); backdrop-filter: blur(12px); }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .custom-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        
+        /* v1.8 Scrollbar Fix */
+        .custom-scroll-hidden::-webkit-scrollbar { display: none; }
+        .custom-scroll-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .wl-tab.active { background-color: #1e293b; border-color: #3E8E35; border-bottom-color: transparent; color: white; }
+        .dark .wl-tab.active { background-color: #1e293b; color: white; }
+        .wl-tab { background-color: transparent; border-color: #cbd5e1; color: #64748b; }
+        .dark .wl-tab { border-color: #334155; color: #94a3b8; }
+        .nav-item.active { border-right: 4px solid #3E8E35; color: #3E8E35; font-weight: 700; background: rgba(62, 142, 53, 0.1); }
+        .mobile-nav-item.active { color: #3E8E35; border-top: 3px solid #3E8E35; }
+        .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem); }
+    </style>
+</head>
+<body class="flex flex-col lg:flex-row h-[100dvh] overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-f8fafc transition-colors duration-300">
+
+    <div class="bg-wave"></div>
+
+    <div id="init-modal" class="fixed inset-0 z-[10000] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-4 transition-opacity duration-300">
+        <div class="glass-panel p-6 sm:p-8 rounded-2xl w-full max-w-md shadow-2xl border-t-4 border-t-brand transition-transform">
+            <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-2">MT Strike Planner</h2>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-6">Enter your starting capital to power the allocation engine.</p>
+            <div class="relative mb-6">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xl">₱</span>
+                <input type="text" id="init-capital" class="w-full bg-white dark:bg-slate-900 border border-brand/50 rounded-xl p-4 pl-10 font-mono text-2xl text-slate-900 dark:text-white focus:ring-2 focus:ring-brand outline-none transition-all" value="100,000" oninput="formatNumberInput(this)">
+            </div>
+            
+            <div class="flex flex-col gap-3 mt-4">
+                <button onclick="startApp()" class="w-full py-3 bg-brand hover:bg-green-700 text-white rounded-xl font-black uppercase tracking-widest text-sm shadow-lg transition active:scale-95">Initialize Engine ➔</button>
+                <button id="btn-cloud-load" onclick="document.getElementById('file-upload').click()" class="w-full py-3 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow transition active:scale-95">Load Save File</button>
+                <input type="file" id="file-upload" class="hidden" accept=".json" onchange="loadData(event)">
+            </div>
+        </div>
+    </div>
+
+    <div id="reset-modal" class="hidden fixed inset-0 z-[10000] bg-red-950/90 backdrop-blur-md flex items-center justify-center p-4 opacity-0 transition-opacity">
+        <div class="bg-white dark:bg-slate-900 border border-red-500 p-6 sm:p-8 rounded-2xl w-full max-w-md shadow-[0_0_50px_rgba(220,38,38,0.3)] transform scale-95 transition-transform text-center" id="reset-content">
+            <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-red-600 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-black text-red-600 dark:text-red-500 mb-2 uppercase tracking-widest">Nuclear Alert</h2>
+            <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">This action erases everything. Sets, capital, and PnL will be wiped. <br><br><strong class="text-slate-900 dark:text-white">This cannot be undone.</strong></p>
+            <div class="flex flex-col gap-3">
+                <button onclick="executeNuclearReset()" class="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-black uppercase tracking-widest transition shadow-lg">Wipe Data</button>
+                <button onclick="hideResetModal()" class="w-full py-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-xs font-bold uppercase tracking-widest transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="image-modal" class="hidden fixed inset-0 z-[10000] bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 transition-opacity cursor-zoom-out" onclick="closeImage()">
+        <img id="modal-img" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl" src="" alt="Chart">
+    </div>
+
+    <div id="sell-modal" class="hidden fixed inset-0 z-[10000] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 transition-opacity">
+        <div class="glass-panel p-6 rounded-2xl w-full max-w-sm shadow-2xl border-t-4 border-t-red-500 transform scale-95 transition-transform flex flex-col gap-5" id="sell-content">
+            
+            <div class="flex flex-col border-b border-slate-200 dark:border-slate-700/50 pb-3">
+                <div class="flex justify-between items-start">
+                    <h2 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Tactical Exit</h2>
+                    <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[9px] font-mono text-slate-500" id="sell-ticker-badge">TICKER</span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1 font-bold" id="sell-total-shares">Active Shares: 0</p>
+            </div>
+            
+            <div>
+                <div class="flex justify-between items-end mb-1.5">
+                    <label class="block text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-widest">Shares to Sell</label>
+                    <div class="flex gap-1">
+                        <button onclick="setSellShares(0.25)" class="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-[9px] font-bold rounded transition shadow-sm">25%</button>
+                        <button onclick="setSellShares(0.50)" class="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-[9px] font-bold rounded transition shadow-sm">50%</button>
+                        <button onclick="setSellShares(0.75)" class="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-[9px] font-bold rounded transition shadow-sm">75%</button>
+                        <button onclick="setSellShares(1.0)" class="px-2 py-0.5 bg-brand/20 hover:bg-brand/30 text-brand text-[9px] font-bold rounded transition shadow-sm">100%</button>
+                    </div>
+                </div>
+                <input type="number" id="sell-shares" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono text-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-red-500 outline-none transition-all" oninput="calcSellPreview()">
+            </div>
+
+            <div>
+                <label class="block text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-widest mb-1.5">Execution Price</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">₱</span>
+                    <input type="number" step="any" id="sell-price" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 pl-8 text-xl font-mono text-slate-900 dark:text-white focus:ring-2 focus:ring-red-500 outline-none transition-all" oninput="calcSellPreview()">
+                </div>
+            </div>
+
+            <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg flex justify-between items-center border border-slate-200 dark:border-slate-700">
+                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Realized PnL Preview</span>
+                <span class="text-lg font-mono font-black" id="sell-preview-pnl">₱0.00</span>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-1">
+                <button onclick="closeSellModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-lg text-sm font-bold transition">Cancel</button>
+                <button onclick="confirmSell()" class="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-black tracking-wider transition shadow-lg">Confirm Exit</button>
+            </div>
+        </div>
+    </div>
+
+    <aside class="hidden lg:flex flex-col w-64 glass-panel border-l-0 border-y-0 border-r border-slate-200 dark:border-slate-700/50 z-20 flex-shrink-0 relative">
+        <div class="p-6 pb-4">
+            <div class="flex items-center gap-3 mb-1">
+                <img src="logo.png" alt="Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm">
+                <div class="flex flex-col">
+                    <h1 class="text-sm font-black tracking-tight text-slate-900 dark:text-white leading-none uppercase">STRIKE PLANNER</h1>
+                    <p class="text-[9px] font-mono font-bold tracking-widest text-brand uppercase mt-1">Tactical v1.8</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 flex flex-col gap-1 mt-4">
+            <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item active text-left px-6 py-4 text-sm font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-3">
+                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg> Dashboard
+            </button>
+            <button onclick="switchView('allocator')" id="nav-allocator" class="nav-item text-left px-6 py-4 text-sm font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-3">
+                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Strike Plan
+            </button>
+        </nav>
+
+        <div class="p-6 border-t border-slate-200 dark:border-slate-700/50 flex flex-col gap-3">
+            <button onclick="undoAction()" id="btn-undo" class="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded text-[10px] font-bold uppercase tracking-widest transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>↩ Undo Action</button>
+            
+            <div class="flex gap-2">
+                <button onclick="document.documentElement.classList.toggle('dark')" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded transition flex items-center justify-center shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                </button>
+                <button onclick="document.getElementById('file-upload').click()" class="flex-1 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded text-[10px] font-bold uppercase tracking-widest transition shadow-sm">Load</button>
+                <button onclick="saveData()" class="flex-1 py-2 bg-brand hover:bg-green-700 text-white rounded text-[10px] font-bold uppercase tracking-widest transition shadow-sm">Save</button>
+            </div>
+            
+            <button onclick="openResetModal()" class="w-full py-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 rounded text-[10px] font-bold uppercase tracking-widest transition shadow-sm">🗑 Reset App</button>
+        </div>
+    </aside>
+
+    <div class="lg:hidden flex items-center justify-between p-4 glass-panel border-b border-slate-200 dark:border-slate-700/50 z-40 flex-shrink-0 w-full sticky top-0">
+        <div class="flex items-center gap-3">
+            <img src="logo.png" alt="Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm">
+            <div class="flex flex-col">
+                <h1 class="text-sm font-black tracking-tight text-slate-900 dark:text-white leading-none uppercase">STRIKE PLANNER</h1>
+                <p class="text-[9px] font-mono font-bold tracking-widest text-brand uppercase mt-1">Tactical v1.8</p>
+            </div>
+        </div>
+        <div class="flex gap-1 sm:gap-2">
+            <button onclick="undoAction()" id="mob-btn-undo" class="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded shadow transition active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+            </button>
+            <button onclick="saveData()" class="w-8 h-8 flex items-center justify-center bg-brand/10 text-brand rounded shadow transition active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </button>
+            <button onclick="document.documentElement.classList.toggle('dark')" class="w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded shadow transition active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+            </button>
+            <button onclick="openResetModal()" class="w-8 h-8 flex items-center justify-center bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded shadow transition active:scale-95">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <nav class="lg:hidden fixed bottom-0 left-0 w-full glass-panel border-t border-slate-200 dark:border-slate-700/50 z-50 grid grid-cols-2 pt-1 pb-safe shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)]">
+        <button onclick="switchView('dashboard')" id="mob-dashboard" class="mobile-nav-item active py-2 flex flex-col items-center justify-center gap-1 text-slate-500 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+            <span class="text-[9px] font-bold uppercase tracking-wider truncate w-full text-center">Dashboard</span>
+        </button>
+        <button onclick="switchView('allocator')" id="mob-allocator" class="mobile-nav-item py-2 flex flex-col items-center justify-center gap-1 text-slate-500 border-t-[3px] border-transparent transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            <span class="text-[9px] font-bold uppercase tracking-wider truncate w-full text-center">Strike Plan</span>
+        </button>
+    </nav>
+
+    <main class="flex-1 overflow-y-auto p-4 lg:p-8 pb-32 lg:pb-8 relative z-10 w-full custom-scroll" id="main-content">
+        <div class="max-w-5xl mx-auto w-full flex flex-col min-h-full">
+
+            <div id="view-dashboard" class="flex flex-col gap-4 lg:gap-6">
+                <div class="glass-panel rounded-2xl p-4 lg:p-6 border-t-4 border-t-brand flex flex-col gap-4 flex-shrink-0">
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 divide-x divide-slate-200 dark:divide-slate-700/50">
+                        <div class="flex flex-col justify-center pr-2 lg:pr-6 overflow-hidden">
+                            <p class="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Total Equity</p>
+                            <p class="text-xl sm:text-2xl lg:text-2xl xl:text-3xl font-mono font-black text-slate-900 dark:text-white leading-none whitespace-nowrap overflow-x-auto custom-scroll-hidden" id="dash-equity">₱0.00</p>
+                        </div>
+                        <div class="flex flex-col justify-center pl-4 lg:px-6 overflow-hidden">
+                            <p class="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Buying Power</p>
+                            <p class="text-xl sm:text-2xl lg:text-2xl xl:text-3xl font-mono font-black text-brand leading-none whitespace-nowrap overflow-x-auto custom-scroll-hidden" id="dash-bp">₱0.00</p>
+                        </div>
+                        <div class="flex flex-col justify-center pl-4 lg:px-6 border-t lg:border-t-0 pt-4 lg:pt-0 overflow-hidden">
+                            <p class="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Unrealized PNL</p>
+                            <p class="text-xl sm:text-2xl lg:text-2xl xl:text-3xl font-mono font-black leading-none whitespace-nowrap overflow-x-auto custom-scroll-hidden" id="dash-unrealized">₱0.00</p>
+                        </div>
+                        <div class="flex flex-col justify-center pl-4 lg:pl-6 border-t lg:border-t-0 pt-4 lg:pt-0 overflow-hidden">
+                            <p class="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Realized PNL</p>
+                            <p class="text-xl sm:text-2xl lg:text-2xl xl:text-3xl font-mono font-black leading-none whitespace-nowrap overflow-x-auto custom-scroll-hidden" id="dash-realized">₱0.00</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+                    <div class="glass-panel p-4 lg:p-6 rounded-2xl flex flex-col items-center justify-between relative w-full gap-4 min-h-[300px]">
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white w-full border-b border-slate-200 dark:border-slate-700/50 pb-2">Capital Allocation</h3>
+                        <div class="relative w-48 h-48 lg:w-56 lg:h-56 flex justify-center items-center">
+                            <canvas id="capitalChart" class="z-10"></canvas>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center z-0 pointer-events-none">
+                                <span class="text-xl font-mono font-black text-slate-800 dark:text-white leading-tight" id="center-deployed-pct">0.0%</span>
+                                <span class="text-[9px] uppercase font-bold tracking-widest text-slate-500">Deployed</span>
+                            </div>
+                        </div>
+                        <div class="w-full flex flex-col gap-2 mt-2 custom-scroll max-h-32 overflow-y-auto pr-2" id="capital-legend"></div>
+                    </div>
+                    
+                    <div class="glass-panel p-4 lg:p-6 rounded-2xl flex flex-col items-center justify-between relative w-full gap-4 min-h-[300px]">
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white w-full border-b border-slate-200 dark:border-slate-700/50 pb-2">Sector Exposure</h3>
+                        <div class="relative w-48 h-48 lg:w-56 lg:h-56 flex justify-center"><canvas id="sectorChart"></canvas></div>
+                        <div class="w-full flex flex-col gap-2 mt-2 custom-scroll max-h-32 overflow-y-auto pr-2" id="sector-legend"></div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-4 lg:p-6 rounded-2xl flex flex-col w-full gap-4 mt-0 lg:mt-0">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700/50 pb-2">Summary of Holdings</h3>
+                    <div class="overflow-x-auto custom-scroll flex-1 relative">
+                        <table class="w-full text-left whitespace-nowrap text-sm">
+                            <thead class="text-slate-500 uppercase text-[9px] tracking-widest border-b border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-900/50 sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-3 font-bold">Ticker</th>
+                                    <th class="p-3 font-bold text-right">Shares</th>
+                                    <th class="p-3 font-bold text-right">Avg Price</th>
+                                    <th class="p-3 font-bold text-right">% PnL</th>
+                                    <th class="p-3 font-bold text-right">Peso PnL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="holdings-summary-body" class="font-mono divide-y divide-slate-100 dark:divide-slate-800">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-allocator" class="flex flex-col gap-4 lg:gap-6 hidden">
+                <div class="flex items-end border-b-2 border-slate-200 dark:border-slate-700/50 overflow-x-auto custom-scroll pb-[2px]" id="set-tabs"></div>
+                
+                <div class="bg-white/50 dark:bg-slate-800/20 p-4 lg:p-6 rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-700/50 shadow-inner flex flex-col gap-6" id="set-container">
+                    </div>
+            </div>
+
+        </div>
+    </main>
+    <script src="engine.js"></script>
+</body>
+</html>

@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dividend Portfolio Sandbox v.2.4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'], 
+                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Consolas', '"Courier New"', 'monospace'] 
+                    },
+                    colors: { brand: '#3E8E35', slate: { 850: '#151e2e', 900: '#0f172a' } }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { transition: background-color 0.3s, color 0.3s; overflow-x: hidden; position: relative; z-index: 0; background-color: transparent; }
+        
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        .glass-panel { background: rgba(255, 255, 255, 0.85); border: 1px solid #cbd5e1; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); backdrop-filter: blur(12px); transition: background-color 0.3s, border-color 0.3s; }
+        .dark .glass-panel { background: rgba(30, 41, 59, 0.75); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); backdrop-filter: blur(12px); }
+        
+        .tab-active { background-color: rgba(255, 255, 255, 0.9); color: #0f172a; border-color: #3E8E35; border-bottom-color: rgba(255, 255, 255, 0.9); }
+        .dark .tab-active { background-color: rgba(30, 41, 59, 0.9); color: white; border-color: #3E8E35; border-bottom-color: transparent; }
+        .tab-inactive { background-color: transparent; color: #64748b; border-color: #cbd5e1; }
+        .dark .tab-inactive { background-color: transparent; color: #94a3b8; border-color: #334155; }
+        
+        .nav-active { background: rgba(241, 245, 249, 0.8); color: #0f172a; border-right: 4px solid #3E8E35; }
+        .dark .nav-active { background: rgba(30,41,59,0.8); color: #ffffff; border-right: 4px solid #3E8E35; }
+        
+        .glow-green { box-shadow: 0 0 20px rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.4); }
+        .glow-yellow { box-shadow: 0 0 20px rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4); }
+        .conic-chart { transition: background 0.4s ease; }
+        
+        /* Custom Scrollbar */
+        .custom-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark .custom-scroll::-webkit-scrollbar-thumb { background: #475569; }
+        
+        /* Custom Range Sliders */
+        input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; margin: 8px 0; touch-action: pan-y; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; background: #cbd5e1; border-radius: 3px; }
+        .dark input[type=range]::-webkit-slider-runnable-track { background: #334155; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #3E8E35; cursor: pointer; margin-top: -9px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); transition: transform 0.1s; }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+
+        /* MOBILE SLIDER FIX */
+        @media (max-width: 1024px) {
+            input[type=range] { pointer-events: none; }
+            input[type=range]::-webkit-slider-thumb { pointer-events: auto; }
+            input[type=range]::-moz-range-thumb { pointer-events: auto; }
+        }
+    </style>
+</head>
+<body class="h-[100dvh] w-full flex flex-col text-slate-900 dark:text-slate-50 transition-colors duration-300 selection:bg-brand selection:text-white overflow-hidden">
+
+    <div id="welcome-modal" class="fixed inset-0 z-[150] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 transition-opacity duration-300">
+        <div class="glass-panel p-8 rounded-3xl w-full max-w-lg shadow-2xl transform transition-transform text-center flex flex-col items-center">
+            <h2 class="text-2xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">Let's Plan Your Dividend Portfolio</h2>
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-8 leading-relaxed text-left">
+                This app will help you plan your dividend portfolio. Once you are done with choosing your dividend paying stocks, the next step is to plan their allocation and dividend schedules in the "Allocator Tab". You can use the "Projections" tab to simulate how much you can grow your funds and plan your monthly top-ups. The "Dividend Calendar" tab simulates when and how much you could receive every payment schedule. There's a Guidebook that will help you to reach you investing goals.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 w-full justify-center">
+                <button id="btn-welcome-load" class="flex-1 px-6 py-3 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition-colors shadow-sm">Load Saved</button>
+                <button id="btn-welcome-fresh" class="flex-1 px-6 py-3 bg-brand hover:opacity-90 text-white font-bold rounded-xl transition-colors shadow-lg">Start Fresh</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="global-loader" class="hidden fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center transition-opacity duration-300 opacity-0">
+        <div class="glass-panel p-6 rounded-3xl flex flex-col items-center shadow-2xl">
+            <div class="relative w-12 h-12 flex items-center justify-center mb-3">
+                <div class="absolute inset-0 border-4 border-slate-200 dark:border-slate-700 rounded-full"></div>
+                <div class="absolute inset-0 border-4 border-brand rounded-full border-t-transparent animate-spin"></div>
+                <img src="logo.png" alt="Logo" class="w-6 h-6 object-contain z-10 drop-shadow-sm">
+            </div>
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest animate-pulse">Processing</span>
+        </div>
+    </div>
+
+    <div id="bg-canvas" class="fixed inset-0 z-[-1] pointer-events-none overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+        <svg class="absolute top-[-10%] left-[-10%] w-[120vw] h-auto text-brand opacity-[0.15] dark:opacity-[0.05] transform rotate-[-5deg]" viewBox="0 0 1440 320" fill="currentColor" preserveAspectRatio="none">
+            <path d="M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,149.3C672,149,768,203,864,224C960,245,1056,235,1152,208C1248,181,1344,139,1392,117.3L1440,96L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
+        </svg>
+        <svg class="absolute bottom-[-10%] right-[-10%] w-[120vw] h-auto text-[#2E6A27] opacity-[0.15] dark:opacity-[0.05] transform rotate-[5deg]" viewBox="0 0 1440 320" fill="currentColor" preserveAspectRatio="none">
+            <path d="M0,256L48,229.3C96,203,192,149,288,149.3C384,149,480,203,576,213.3C672,224,768,192,864,170.7C960,149,1056,139,1152,149.3C1248,160,1344,192,1392,208L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+        </svg>
+    </div>
+
+    <div id="reset-modal" class="hidden fixed inset-0 z-[100] bg-red-950/60 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 opacity-0">
+        <div class="bg-white dark:bg-slate-900 p-8 rounded-[2rem] w-full max-w-md shadow-2xl transform transition-all scale-95 flex flex-col items-center text-center border-t-8 border-t-red-600" id="reset-modal-content">
+            <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center text-3xl mb-4">⚠️</div>
+            <h2 class="text-xl font-black text-red-600 dark:text-red-400 mb-2 uppercase tracking-tight">Nuclear Alert</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">This action erases everything. Buying power, holdings, and all logs will be permanently wiped. This cannot be undone.</p>
+            
+            <div class="w-full bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 mb-6">
+                <label class="block text-[10px] text-slate-400 uppercase tracking-widest font-black mb-2">Type code to confirm</label>
+                <div class="text-3xl font-mono font-black tracking-widest text-slate-900 dark:text-white mb-3 select-none" id="reset-rand-code">000</div>
+                <input type="text" id="reset-input" placeholder="Enter Code Here" class="w-full text-center bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-3 text-lg font-mono focus:ring-2 focus:ring-red-500 outline-none transition-all text-slate-900 dark:text-white">
+            </div>
+
+            <div class="flex flex-col gap-2 w-full">
+                <button id="btn-reset-confirm" class="w-full py-3 bg-red-600 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg cursor-not-allowed opacity-30 transition-all" disabled>Reset Sandbox</button>
+                <button id="btn-reset-cancel" class="w-full py-2 text-slate-500 dark:text-slate-400 text-[10px] font-bold hover:text-slate-800 dark:hover:text-white transition-colors">Cancel (Safe Zone)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="funding-modal" class="hidden fixed inset-0 z-[60] bg-slate-900/40 dark:bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity duration-300 opacity-0">
+        <div class="glass-panel p-6 rounded-2xl w-full max-w-md shadow-2xl transform transition-transform scale-95" id="funding-modal-content">
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">💵 Manage Funds</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Deposit Type</label>
+                    <select id="modal-category" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm font-semibold focus:ring-2 focus:ring-brand focus:outline-none transition-all text-slate-900 dark:text-white cursor-pointer">
+                        <option value="Initial Capital">Initial Capital</option>
+                        <option value="Routine Top-Up">Routine Top-Up</option>
+                        <option value="Dividend Reinvestment">Dividend Reinvestment</option>
+                        <option value="Withdrawal">Withdrawal</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Amount (₱)</label>
+                    <input type="text" inputmode="decimal" id="modal-amount" placeholder="e.g. 50000" class="comma-input w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-lg font-mono focus:ring-2 focus:ring-brand focus:outline-none transition-all text-slate-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Remarks</label>
+                    <input type="text" id="modal-remarks" placeholder="Optional notes..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand focus:outline-none transition-all text-slate-900 dark:text-white">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button id="btn-modal-cancel" class="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-lg transition-colors">Cancel</button>
+                <button id="btn-modal-submit" class="px-4 py-2 bg-brand hover:opacity-90 text-white text-sm font-bold rounded-lg transition-colors shadow-sm">Confirm Ledger</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="lg:hidden flex-shrink-0 w-full bg-white/70 dark:bg-slate-850/70 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 p-4 flex justify-between items-center z-40 relative">
+        <div class="flex items-center gap-2">
+            <img src="logo.png" alt="Logo" class="w-8 h-8 object-contain drop-shadow-sm">
+            <div class="flex flex-col">
+                <h1 class="text-xs font-bold leading-none uppercase tracking-wider text-slate-800 dark:text-slate-100">Dividend Portfolio</h1>
+                <p class="text-[8px] text-brand font-mono font-bold tracking-widest mt-0.5">Sandbox v.2.4</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="btn-undo-mob" class="hidden p-2 rounded-lg bg-green-100 dark:bg-green-600/20 text-green-700 dark:text-green-400 hover:bg-green-200 transition-colors border border-green-300 shadow-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg></button>
+            <button id="btn-load-mob" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></button>
+            <button id="btn-save-mob" class="p-2 rounded-lg bg-brand text-white shadow-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg></button>
+            <button class="theme-toggle-btn p-2 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm">
+                <svg class="w-4 h-4 hidden dark:block text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
+                <svg class="w-4 h-4 block dark:hidden text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+            </button>
+            <button onclick="openResetModal()" class="p-2 rounded-lg bg-red-100 dark:bg-red-900/20 text-red-600 shadow-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex flex-col lg:flex-row w-full min-h-0 overflow-hidden relative">
+        
+        <nav class="hidden lg:flex w-64 flex-shrink-0 bg-white/70 dark:bg-slate-850/70 backdrop-blur-2xl border-r border-slate-200/50 dark:border-slate-800/50 flex-col justify-between transition-all duration-300 z-20 shadow-sm relative">
+            <div>
+                <div class="h-20 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-200/50 dark:border-slate-800/50">
+                    <img src="logo.png" alt="Logo" class="w-10 h-10 object-contain drop-shadow-sm">
+                    <div class="hidden lg:block ml-3">
+                        <h1 class="text-xs font-bold leading-tight uppercase tracking-wider text-slate-800 dark:text-slate-100">Dividend<br>Portfolio</h1>
+                        <p class="text-[9px] text-brand font-mono font-bold mt-0.5 tracking-widest">Sandbox v.2.4</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col mt-6 gap-2 px-3">
+                    <button onclick="switchMainView('dashboard')" id="nav-dashboard" class="nav-active w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group">
+                        <svg class="w-5 h-5 text-slate-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+                        <span class="text-sm font-bold">Dashboard</span>
+                    </button>
+                    <button onclick="switchMainView('allocator')" id="nav-allocator" class="w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 group">
+                        <svg class="w-5 h-5 text-slate-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                        <span class="text-sm font-bold">Allocator</span>
+                    </button>
+                    <button onclick="switchMainView('ledgers')" id="nav-ledgers" class="w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 group">
+                        <svg class="w-5 h-5 text-slate-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        <span class="text-sm font-bold">Ledgers</span>
+                    </button>
+                    <button onclick="switchMainView('projections')" id="nav-projections" class="w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 group border-t border-slate-200/50 dark:border-slate-800/50 mt-2 pt-5">
+                        <svg class="w-5 h-5 text-slate-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        <span class="text-sm font-bold">Projections</span>
+                    </button>
+                    <button onclick="switchMainView('calendar')" id="nav-calendar" class="w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 group">
+                        <svg class="w-5 h-5 text-slate-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        <span class="text-sm font-bold">Div Calendar</span>
+                    </button>
+                    <button onclick="switchMainView('guidebook')" id="nav-guidebook" class="w-full flex items-center justify-start gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400 group border-t border-slate-200/50 dark:border-slate-800/50 mt-2 pt-5">
+                        <svg class="w-5 h-5 text-slate-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                        <span class="text-sm font-bold">The Guidebook</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-4 flex flex-col gap-3 border-t border-slate-200/50 dark:border-slate-800/50 bg-transparent">
+                <button id="btn-undo-desk" class="hidden w-full flex items-center justify-center lg:justify-start gap-3 p-2 rounded-lg bg-green-100 dark:bg-green-600/20 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-600/40 transition-colors border border-green-300 dark:border-green-600/50 shadow-sm mb-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">Undo Action</span>
+                </button>
+                <div class="flex gap-2">
+                    <input type="file" id="file-load" class="hidden" accept=".json">
+                    <button class="theme-toggle-btn flex-shrink-0 p-2.5 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg transition-colors flex justify-center items-center shadow-sm w-full lg:w-auto mx-auto lg:mx-0">
+                        <svg class="w-4 h-4 hidden dark:block text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
+                        <svg class="w-4 h-4 block dark:hidden text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                    </button>
+                    <button id="btn-load-desk" class="flex-1 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors shadow-sm">Load</button>
+                    <button id="btn-save-desk" class="flex-1 py-2 bg-brand text-white text-xs font-bold rounded-lg hover:opacity-90 shadow-sm">Save</button>
+                </div>
+                <button onclick="openResetModal()" class="w-full flex items-center justify-center lg:justify-start gap-3 p-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors border border-red-200 dark:border-red-800/30 shadow-sm mt-3 group">
+                    <svg class="w-5 h-5 text-red-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    <span class="text-[11px] font-bold uppercase tracking-widest text-red-600 dark:text-red-400">Reset Sandbox</span>
+                </button>
+                <div class="pt-3 border-t border-slate-200/50 dark:border-slate-800/50 mt-1 text-center relative z-10">
+                    <p class="text-[8px] text-slate-400 dark:text-slate-500 font-mono tracking-widest leading-relaxed">© 2026 The Market Technician.<br>All rights reserved.</p>
+                </div>
+            </div>
+        </nav>
+
+        <main class="flex-1 flex flex-col overflow-y-auto custom-scroll relative z-10 min-h-0">
+            
+            <div class="p-4 md:p-8 w-full max-w-7xl mx-auto flex flex-col gap-6 pb-32 lg:pb-8">
+                <div class="glass-panel p-4 md:p-6 rounded-2xl flex flex-col gap-4 shadow-sm border-t-4 border-t-brand w-full shrink-0">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 w-full">
+                        <div class="bg-white/50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex flex-col justify-center relative transition-colors">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Equity</p>
+                            </div>
+                            <p class="text-xl font-mono font-bold text-slate-900 dark:text-white truncate" id="g-equity">₱0.00</p>
+                        </div>
+
+                        <div class="bg-white/50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex flex-col justify-center cursor-pointer relative transition-colors" onclick="switchMainView('ledgers')">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider group-hover:text-brand transition-colors">Buying Power</p>
+                            </div>
+                            <p class="text-xl font-mono font-bold text-brand truncate" id="g-cash">₱0.00</p>
+                        </div>
+
+                        <div class="bg-white/50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex flex-col justify-center relative transition-colors" id="g-pnl-box">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider">Unrealized PnL</p>
+                            </div>
+                            <div class="flex items-baseline gap-2 truncate">
+                                <p class="text-xl font-mono font-bold text-slate-500" id="g-pnl-peso">₱0.00</p>
+                                <span class="text-xs font-mono font-bold text-slate-400" id="g-pnl-pct">0.00%</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white/50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex flex-col justify-center relative transition-colors" id="g-realized-box">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Realized Gain</p>
+                            </div>
+                            <div class="flex items-baseline gap-2 truncate">
+                                <p class="text-xl font-mono font-bold text-slate-500" id="g-realized-peso">₱0.00</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-green-50/70 dark:bg-green-900/10 p-4 rounded-xl border border-green-200 dark:border-green-900/30 shadow-sm flex flex-col justify-center relative transition-colors">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-[10px] text-green-700 dark:text-green-500/80 uppercase tracking-wider truncate">Annual Div Flow <span class="font-bold border border-green-500 rounded px-1 ml-1 text-[8px]">Est. Net</span></p>
+                            </div>
+                            <p class="text-xl font-mono font-bold text-green-600 dark:text-green-400 truncate" id="g-annual-div">₱0.00</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-50/50 dark:bg-slate-900/30 p-3 rounded-xl border border-slate-200 dark:border-slate-700/30 shadow-sm flex flex-col mt-2 relative z-10">
+                        <div class="flex flex-col sm:flex-row sm:justify-between text-xs text-slate-500 uppercase tracking-wider mb-2 gap-1" id="g-bar-labels">
+                            <span class="font-mono text-brand font-bold text-center sm:text-left">0.0% DEPLOYED</span>
+                            <span class="font-mono text-slate-500 font-bold text-center sm:text-right">100.0% CASH</span>
+                        </div>
+                        <div id="g-bar-container" class="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner"></div>
+                    </div>
+                </div>
+
+                <div id="view-dashboard" class="w-full flex flex-col gap-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10">
+                        <div class="glass-panel p-6 rounded-2xl flex flex-col items-center relative">
+                            <h3 class="text-sm text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider mb-6">Portfolio Allocation</h3>
+                            <div class="relative w-48 h-48 rounded-full flex items-center justify-center shadow-lg conic-chart border border-slate-200 dark:border-transparent" id="port-pie" style="background: conic-gradient(#cbd5e1 0% 100%);">
+                                <div class="w-32 h-32 bg-white dark:bg-slate-850 rounded-full flex flex-col items-center justify-center shadow-inner border border-slate-200 dark:border-slate-700/30 z-10">
+                                    <span class="text-[10px] text-slate-500 uppercase tracking-widest">Total Equity</span>
+                                    <span class="text-lg font-mono font-bold text-slate-900 dark:text-white mt-1 truncate max-w-[90%]" id="pie-port-total">₱0</span>
+                                </div>
+                            </div>
+                            <div class="w-full grid grid-cols-2 gap-y-3 gap-x-2 text-xs font-mono mt-8 relative z-10" id="port-legend"></div>
+                        </div>
+
+                        <div class="glass-panel p-6 rounded-2xl flex flex-col items-center relative">
+                            <h3 class="text-sm text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider mb-6">Sector Exposure</h3>
+                            <div class="relative w-48 h-48 rounded-full flex items-center justify-center shadow-lg conic-chart border border-slate-200 dark:border-transparent" id="sector-pie" style="background: conic-gradient(#cbd5e1 0% 100%);">
+                                <div class="w-32 h-32 bg-white dark:bg-slate-850 rounded-full flex flex-col items-center justify-center shadow-inner border border-slate-200 dark:border-slate-700/30 z-10">
+                                    <span class="text-[10px] text-slate-500 uppercase tracking-widest">Deployed</span>
+                                    <span class="text-lg font-mono font-bold text-brand mt-1 truncate max-w-[90%]" id="pie-sector-total">₱0</span>
+                                </div>
+                            </div>
+                            <div class="w-full grid grid-cols-2 gap-y-3 gap-x-2 text-xs font-mono mt-8 relative z-10" id="sector-legend"></div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel rounded-2xl overflow-hidden mt-2 relative z-10">
+                        <div class="p-5 border-b border-slate-200 dark:border-slate-700/50 bg-slate-50/80 dark:bg-slate-800/30">
+                            <h3 class="text-lg text-slate-900 dark:text-white font-bold uppercase tracking-wider">My Holdings</h3>
+                        </div>
+                        
+                        <div class="hidden lg:grid grid-cols-9 gap-4 p-4 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 font-mono bg-slate-100/50 dark:bg-slate-900/80">
+                            <div class="col-span-2 font-semibold">Stock</div>
+                            <div class="font-semibold text-right">Alloc %</div>
+                            <div class="font-semibold text-right">Shares</div>
+                            <div class="font-semibold text-right">Avg Price</div>
+                            <div class="font-semibold text-right">Mkt Price</div>
+                            <div class="font-semibold text-right">Current Value</div>
+                            <div class="font-semibold text-right">Unrealized PnL</div>
+                            <div class="font-semibold text-right">% PnL</div>
+                        </div>
+
+                        <div id="holdings-body" class="flex flex-col divide-y divide-slate-200 dark:divide-slate-800/50 bg-white/50 dark:bg-transparent"></div>
+                    </div>
+                </div>
+
+                <div id="view-allocator" class="w-full flex flex-col gap-6 hidden">
+                    
+                    <div id="fund-first-banner" class="hidden bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-2xl flex-col sm:flex-row items-center justify-between gap-4 shadow-sm transition-all duration-500 relative z-10">
+                        <div class="flex items-center gap-4 text-center sm:text-left">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-800 flex flex-shrink-0 items-center justify-center text-blue-600 dark:text-blue-300 text-lg">💡</div>
+                            <div>
+                                <p class="text-sm font-bold text-blue-900 dark:text-blue-100">Welcome to your Terminal!</p>
+                                <p class="text-xs text-blue-700 dark:text-blue-300 mt-1">Add funds to Buying Power to execute buy orders.</p>
+                            </div>
+                        </div>
+                        <button onclick="openFundModal()" class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-colors shadow-md whitespace-nowrap">Manage Funds</button>
+                    </div>
+
+                    <div class="flex flex-col mt-2 relative z-10">
+                        <div class="flex flex-wrap gap-1.5 px-2" id="tabs-container"></div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-200/50 dark:bg-slate-800/20 p-4 sm:p-6 rounded-2xl rounded-tl-none border border-slate-300 dark:border-slate-700/50 -mt-[2px] shadow-inner dark:shadow-none backdrop-blur-sm relative z-10">
+                            
+                            <div class="lg:col-span-7 flex flex-col gap-6">
+                                <div class="glass-panel p-6 rounded-2xl space-y-6 relative overflow-hidden h-full flex flex-col">
+                                    <div id="ticker-watermark" class="absolute -right-4 -bottom-4 text-8xl font-black text-slate-100 dark:text-slate-800/30 pointer-events-none uppercase"></div>
+
+                                    <div class="relative z-10">
+                                        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-300 mb-4 flex items-center gap-2"><div class="w-2 h-2 bg-brand rounded-full"></div> 1. Asset & Market Data</h3>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+                                            <div>
+                                                <label class="block text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Ticker</label>
+                                                <input type="text" id="t-ticker" placeholder="e.g. AREIT" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg p-3 font-mono font-bold uppercase focus:ring-2 focus:ring-brand outline-none transition-all shadow-inner">
+                                            </div>
+                                            <div class="relative">
+                                                <label class="block text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Sector</label>
+                                                <div class="relative">
+                                                    <select id="t-sector" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 pr-8 text-xs font-semibold focus:ring-2 focus:ring-brand outline-none transition-all appearance-none cursor-pointer">
+                                                        <option value="Financial">Financial</option>
+                                                        <option value="Utilities">Utilities</option>
+                                                        <option value="Energy">Energy</option>
+                                                        <option value="Property">Property</option>
+                                                        <option value="Holdings">Holdings</option>
+                                                        <option value="Consumer">Consumer</option>
+                                                        <option value="Telco">Telco</option>
+                                                        <option value="Mining">Mining</option>
+                                                        <option value="Others">Others</option>
+                                                    </select>
+                                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] text-green-600 dark:text-green-500 uppercase tracking-wider mb-2 font-bold">Div Per Share</label>
+                                                <div class="relative">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">₱</span>
+                                                    <input type="text" inputmode="decimal" id="t-dps" class="comma-input w-full bg-white dark:bg-slate-900 border border-green-300 dark:border-green-900/50 rounded-lg p-3 pl-7 font-mono focus:ring-2 focus:ring-green-500 outline-none transition-all shadow-inner" placeholder="0.00">
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] text-purple-600 dark:text-purple-400 uppercase tracking-wider mb-2 font-bold">Market Price</label>
+                                                <div class="relative">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">₱</span>
+                                                    <input type="text" inputmode="decimal" id="t-mkt-price" class="comma-input w-full bg-white dark:bg-slate-900 border border-purple-300 dark:border-purple-900/50 rounded-lg p-3 pl-7 font-mono focus:ring-2 focus:ring-purple-500 outline-none transition-all shadow-inner" placeholder="0.00">
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-span-1 sm:col-span-2 md:col-span-4 mt-2">
+                                                <label class="block text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Payout Schedule <span class="normal-case font-normal italic text-[9px] ml-2">(Click months)</span></label>
+                                                <div class="flex flex-wrap gap-1.5" id="t-schedule-container"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="h-px w-full bg-slate-200 dark:bg-slate-700/50 relative z-10"></div>
+
+                                    <div class="mt-auto relative z-10">
+                                        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-300 mb-4 flex items-center gap-2"><div class="w-2 h-2 bg-amber-500 rounded-full"></div> 2. Order Ticket</h3>
+                                        <div class="flex gap-3 mb-6 relative z-10">
+                                            <button id="btn-toggle-buy" class="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-green-500 hover:text-green-600 font-bold tracking-wider uppercase transition-all shadow-sm">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg> Buy
+                                            </button>
+                                            <button id="btn-toggle-sell" class="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-red-500 hover:text-red-600 font-bold tracking-wider uppercase transition-all shadow-sm">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg> Sell
+                                            </button>
+                                        </div>
+
+                                        <div id="action-inputs-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4 transition-all duration-300 opacity-0 pointer-events-none h-0 overflow-hidden relative z-10">
+                                            <div>
+                                                <label class="block text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Execution Price</label>
+                                                <div class="relative">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">₱</span>
+                                                    <input type="text" inputmode="decimal" id="t-act-price" class="comma-input w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 pl-7 text-xl font-mono focus:ring-2 focus:ring-brand outline-none transition-all shadow-inner" placeholder="0.00">
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold" id="action-label-shares">Number of Shares</label>
+                                                <input type="text" inputmode="decimal" id="t-act-shares" class="comma-input w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-xl font-mono focus:ring-2 focus:ring-brand outline-none transition-all shadow-inner" placeholder="0">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="lg:col-span-5 flex flex-col h-full relative z-10">
+                                <div class="glass-panel p-6 sm:p-8 rounded-2xl h-full flex flex-col gap-6 relative transition-all duration-300" id="hud-panel">
+                                    <div class="flex justify-between items-end relative z-10">
+                                        <div>
+                                            <h3 class="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Total Shares</h3>
+                                            <div class="text-4xl sm:text-5xl font-mono font-bold text-slate-900 dark:text-white" id="out-shares">0</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <h3 class="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Yield (Gross)</h3>
+                                            <div class="text-2xl sm:text-3xl font-mono font-bold text-brand" id="out-yoc">0.00%</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-3 sm:gap-4 relative z-10">
+                                        <div class="bg-slate-50 dark:bg-slate-900/60 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-inner transition-colors">
+                                            <h3 class="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-wider mb-1">Avg Cost</h3>
+                                            <div class="text-lg sm:text-xl font-mono font-bold truncate" id="out-avg-entry">₱0.00</div>
+                                        </div>
+                                        <div class="bg-slate-50 dark:bg-slate-900/60 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-inner transition-colors">
+                                            <h3 class="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-wider mb-1">Cap Deployed</h3>
+                                            <div class="text-lg sm:text-xl font-mono font-bold truncate" id="out-asset-val">₱0.00</div>
+                                        </div>
+                                        
+                                        <div class="col-span-2 bg-white dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center shadow-inner transition-colors transition-all duration-300" id="action-impact-box">
+                                            <div id="action-text-wrapper" class="flex flex-col w-full mb-3 sm:mb-0 transition-all duration-300">
+                                                <h3 class="text-[10px] text-slate-500 uppercase tracking-wider mb-1" id="out-act-label">Data Action</h3>
+                                                <div class="text-xl font-mono font-bold text-slate-700 dark:text-slate-400 truncate transition-all duration-300" id="out-act-flow">Ready to Sync</div>
+                                                <p class="text-[10px] text-slate-500 mt-1 font-mono hidden" id="out-act-fees">-</p>
+                                            </div>
+                                            <button id="btn-commit" class="w-full sm:w-auto px-5 py-3 bg-brand text-white font-bold rounded-lg shadow-md transition-all whitespace-nowrap">Update Dashboard</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-auto bg-white/80 dark:bg-slate-900/80 rounded-2xl p-4 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-inner relative z-10 transition-colors">
+                                        <div class="border-b border-slate-200 dark:border-slate-700/80 pb-3 flex justify-between items-center mb-4 transition-colors">
+                                            <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider">Cash Flow Proj.</h3>
+                                            <span class="text-[8px] sm:text-[9px] font-mono font-bold bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 px-2 py-1 rounded border border-green-200 dark:border-green-500/30">Est. Net Yield</span>
+                                        </div>
+                                        <div class="flex flex-col sm:flex-row justify-between sm:items-end relative z-10 gap-4 sm:gap-0">
+                                            <div>
+                                                <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 sm:mb-2 transition-colors">Annual Div</p>
+                                                <p class="text-2xl sm:text-3xl font-mono font-black text-green-600 dark:text-green-400 truncate" id="out-ann-div">₱0.00</p>
+                                            </div>
+                                            <div class="sm:text-right">
+                                                <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 sm:mb-2 transition-colors">Monthly Equivalent</p>
+                                                <div class="inline-flex px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-green-100 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 shadow-inner">
+                                                    <span class="text-lg sm:text-xl font-mono font-bold text-green-600 dark:text-green-400 truncate" id="out-mon-div">₱0.00</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="warning-msg" class="absolute bottom-[-15px] left-1/2 transform -translate-x-1/2 w-[90%] text-xs sm:text-sm text-yellow-600 hidden font-bold text-center bg-yellow-100 p-2 sm:p-3 rounded-lg border border-yellow-400 shadow-xl z-20 transition-all duration-300">
+                                        ⚠️ Cash pool depleted.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-ledgers" class="w-full flex flex-col gap-6 hidden relative z-10">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start relative z-10">
+                        <div class="glass-panel rounded-2xl overflow-hidden flex flex-col shadow-sm relative z-10 max-h-[600px]">
+                            <div class="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/30 flex justify-between items-center transition-colors">
+                                <h3 class="text-lg font-bold uppercase tracking-wider">Funding Log</h3>
+                                <button onclick="openFundModal()" class="px-4 py-2 bg-brand hover:opacity-90 text-white text-xs font-bold rounded-lg shadow-sm transition-colors">+ Manage Funds</button>
+                            </div>
+                            <div class="hidden lg:grid grid-cols-5 gap-4 p-4 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 font-mono bg-slate-100/50 dark:bg-slate-900/80">
+                                <div class="font-semibold">Date</div><div class="font-semibold">Amount (₱)</div><div class="font-semibold">Type</div><div class="font-semibold col-span-2">Remarks</div>
+                            </div>
+                            <div id="funding-body" class="flex-1 overflow-y-auto custom-scroll flex flex-col divide-y divide-slate-200 dark:divide-slate-800/50 bg-white/50 dark:bg-transparent transition-colors"></div>
+                        </div>
+                        <div class="glass-panel rounded-2xl overflow-hidden flex flex-col shadow-sm relative z-10 max-h-[600px]">
+                            <div class="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/30 flex justify-between items-center transition-colors">
+                                <h3 class="text-lg font-bold uppercase tracking-wider">Trade Log</h3>
+                                <span class="text-xs text-slate-500 font-mono transition-colors">Auto-generated</span>
+                            </div>
+                            <div class="hidden lg:grid grid-cols-6 gap-4 p-4 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 font-mono bg-slate-100/50 dark:bg-slate-900/80">
+                                <div class="font-semibold">Date</div><div class="font-semibold">Ticker</div><div class="font-semibold">Action</div><div class="font-semibold text-right">Net Amount</div><div class="font-semibold text-right">Realized PnL</div><div></div>
+                            </div>
+                            <div id="trade-body" class="flex-1 overflow-y-auto custom-scroll flex flex-col divide-y divide-slate-200 dark:divide-slate-800/50 bg-white/50 dark:bg-transparent transition-colors"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-projections" class="w-full flex flex-col gap-6 hidden relative z-10">
+                    <h2 class="text-2xl font-bold tracking-tight mb-2 relative z-10">Wealth Projections <span class="text-sm text-slate-500 font-normal ml-2 tracking-normal transition-colors">The Sandbox</span></h2>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
+                        <div class="lg:col-span-4 glass-panel rounded-2xl p-6 flex flex-col gap-6 relative z-10">
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest transition-colors">Sandbox Sync</h3>
+                                    <div class="flex items-center gap-2 bg-green-500/10 text-green-600 dark:text-green-400 px-3 py-1.5 rounded-lg border border-green-500/30 text-[9px] font-bold font-mono shadow-inner transition-all">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                        Synced w/ Ledger
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-3 relative z-10">
+                                    <div class="bg-brand/10 border border-brand/20 rounded-lg p-4 shadow-inner">
+                                        <p class="text-[9px] text-brand uppercase tracking-wider mb-1">Current Portfolio Value</p>
+                                        <p class="font-mono font-bold text-slate-900 dark:text-white text-xl truncate" id="sync-cap">₱0.00</p>
+                                    </div>
+                                    <div class="bg-brand/10 border border-brand/20 rounded-lg p-4 shadow-inner">
+                                        <p class="text-[9px] text-brand uppercase tracking-wider mb-1">Est. Net Yield</p>
+                                        <p class="font-mono font-bold text-slate-900 dark:text-white text-3xl truncate" id="sync-net-yld">0.0%</p>
+                                        <p class="text-[9px] text-slate-500 mt-1 transition-colors" id="sync-gross-yld">(from 0.0% Gross)</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="h-px bg-slate-200 dark:bg-slate-700/50 relative z-10 transition-colors"></div>
+
+                            <div class="space-y-6 relative z-10">
+                                <div>
+                                    <div class="flex justify-between text-xs text-slate-500 mb-2 items-center transition-colors relative z-10 font-bold">
+                                        <span>Dividend Strategy</span>
+                                    </div>
+                                    <div class="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-lg w-full border border-slate-300 dark:border-slate-700/50 shadow-inner">
+                                        <button id="proj-toggle-drip" class="flex-1 px-2 py-1.5 rounded bg-white dark:bg-slate-700 text-brand dark:text-green-400 text-[10px] font-bold shadow-sm transition-all">DRIP (Reinvest)</button>
+                                        <button id="proj-toggle-cash" class="flex-1 px-2 py-1.5 rounded text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-[10px] font-bold transition-all">Cash Out</button>
+                                    </div>
+                                    <p class="text-[9px] text-slate-400 mt-2" id="proj-strategy-desc">Dividends buy more shares (Exponential).</p>
+                                </div>
+
+                                <div>
+                                    <div class="flex justify-between text-xs text-slate-500 mb-2 items-center transition-colors relative z-10 font-bold">
+                                        <span>Planned Top-Up</span>
+                                        <div class="flex items-center gap-2">
+                                            <select id="slide-freq" class="bg-transparent border-none outline-none font-bold text-brand text-right cursor-pointer appearance-none transition-colors">
+                                                <option value="12">Monthly</option>
+                                                <option value="4">Quarterly</option>
+                                                <option value="2">Semi-Annually</option>
+                                                <option value="1">Annually</option>
+                                            </select>
+                                            <span id="val-topup" class="font-mono font-bold text-slate-800 dark:text-slate-200">₱0</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" id="slide-topup" min="0" max="100000" step="500" value="0" class="relative z-10">
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-xs text-slate-500 mb-2 items-center transition-colors relative z-10 font-bold">
+                                        <span>Est. Capital Growth</span>
+                                        <span id="val-grw" class="font-mono font-bold text-slate-800 dark:text-slate-200">5.0%</span>
+                                    </div>
+                                    <input type="range" id="slide-grw" min="0" max="25" step="0.1" value="5" class="relative z-10">
+                                </div>
+                            </div>
+
+                            <div class="h-px bg-slate-200 dark:bg-slate-700/50 relative z-10 transition-colors"></div>
+
+                            <div class="space-y-6 relative z-10">
+                                <div class="grid grid-cols-2 gap-4 relative z-10">
+                                    <div>
+                                        <div class="flex justify-between text-[10px] text-slate-500 mb-2 transition-colors font-bold"><span>Current Age</span> <span id="val-age1" class="font-mono font-bold text-slate-800 dark:text-slate-200">30</span></div>
+                                        <input type="range" id="slide-age1" min="18" max="70" step="1" value="30" class="relative z-10">
+                                    </div>
+                                    <div>
+                                        <div class="flex justify-between text-[10px] text-slate-500 mb-2 items-center transition-colors relative z-10 font-bold">
+                                            <span>Stop Age</span>
+                                            <span id="val-age2" class="font-mono font-bold text-purple-600 dark:text-purple-400">45</span>
+                                        </div>
+                                        <input type="range" id="slide-age2" min="18" max="80" step="1" value="45" class="relative z-10">
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-xs text-slate-500 mb-2 transition-colors relative z-10 font-bold"><span>Retirement Age</span> <span id="val-age3" class="font-mono font-bold text-slate-800 dark:text-slate-200">65</span></div>
+                                    <input type="range" id="slide-age3" min="40" max="80" step="1" value="65" class="relative z-10">
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-[10px] text-slate-500 mb-2 items-center transition-colors relative z-10 font-bold">
+                                        <span>Retirement Income Goal</span>
+                                        <span id="val-inc" class="font-mono font-bold text-brand">₱50,000</span>
+                                    </div>
+                                    <input type="range" id="slide-inc" min="10000" max="500000" step="5000" value="50000" class="relative z-10">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-8 flex flex-col gap-6 relative z-10">
+                            <div class="glass-panel rounded-2xl p-4 sm:p-6 relative z-10">
+                                <div class="flex justify-between items-start mb-2 relative z-10 transition-colors">
+                                    <h2 class="text-sm font-bold uppercase tracking-wider">Compound Trajectory</h2>
+                                    <div class="flex items-center gap-3 text-[10px] font-mono font-bold relative z-10">
+                                        <span class="text-brand flex items-center gap-1 transition-colors"><div class="w-2 h-2 rounded-full bg-brand"></div> Total Value</span>
+                                        <span class="text-slate-500 flex items-center gap-1 transition-colors"><div class="w-2 h-2 rounded-full bg-slate-400 border border-slate-500 transition-colors"></div> Invested</span>
+                                    </div>
+                                </div>
+                                <div class="relative h-48 sm:h-64 md:h-80 w-full mt-2 z-10"><canvas id="reinvestChart"></canvas></div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                                <div class="glass-panel p-6 sm:p-8 rounded-2xl text-center border-t-4 border-t-blue-500 relative overflow-hidden z-10 transition-colors">
+                                    <div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
+                                    <h3 class="text-xs text-slate-500 uppercase tracking-wider mb-2 transition-colors">Target Fund Needed</h3>
+                                    <p class="text-3xl sm:text-4xl font-mono font-bold text-slate-900 dark:text-white truncate" id="out-target">₱0.00</p>
+                                    <p class="text-[10px] text-slate-500 mt-2 transition-colors">To generate target income.</p>
+                                    <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/50 transition-colors relative z-10">
+                                        <h3 class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider mb-1 transition-colors" id="label-req-topup">Suggested Monthly Top-Up</h3>
+                                        <p class="text-lg font-mono font-bold text-blue-600 dark:text-blue-400 transition-all" id="out-req-topup">₱0.00 / mo</p>
+                                        <p id="out-req-subtext" class="text-[9px] mt-1 leading-tight text-slate-500 transition-all"></p>
+                                    </div>
+                                </div>
+                                
+                                <div class="glass-panel p-6 sm:p-8 rounded-2xl text-center border-t-4 relative overflow-hidden z-10 transition-colors" id="status-card">
+                                    <div class="absolute top-0 left-0 w-full h-1 bg-brand" id="status-line"></div>
+                                    <h3 class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider mb-2 transition-colors">Projected Fund at Age <span id="card-age">65</span></h3>
+                                    <p class="text-3xl sm:text-4xl font-mono font-bold text-brand truncate" id="out-projected">₱0.00</p>
+                                    <p class="text-[10px] text-slate-500 mt-2 transition-colors">Based on your planned timeline.</p>
+                                    <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/50 transition-colors relative z-10">
+                                        <h3 class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider mb-1 transition-colors">Projected Monthly Income</h3>
+                                        <p class="text-lg font-mono font-bold text-brand truncate" id="out-proj-inc">₱0.00 / mo</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="glass-panel rounded-2xl p-6 sm:p-8 bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-800/80 dark:to-slate-900 shadow-sm border-l-4 border-l-brand relative overflow-hidden z-10 transition-colors">
+                                <h3 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 relative z-10 transition-colors">Financial Summary</h3>
+                                <p class="text-sm sm:text-base leading-relaxed text-slate-700 dark:text-slate-300 relative z-10 transition-colors" id="narrative-box"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-calendar" class="w-full flex flex-col gap-6 hidden relative z-10">
+                    
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-1 gap-4 relative z-10 transition-colors w-full">
+                        <h2 class="text-2xl font-bold tracking-tight">Your Dividend Calendar</h2>
+                        <div class="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-lg w-full md:w-auto border border-slate-300 dark:border-slate-700/50 shadow-inner">
+                            <button id="cal-toggle-current" class="flex-1 px-4 py-2 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-[10px] sm:text-xs font-bold shadow-sm transition-all">Current Projection</button>
+                            <button id="cal-toggle-future" class="flex-1 px-4 py-2 rounded text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-[10px] sm:text-xs font-bold transition-all">Future Projections</button>
+                        </div>
+                    </div>
+                    <p id="cal-subtitle" class="text-xs text-slate-500 dark:text-slate-400 mb-4 pb-4 border-b border-slate-200 dark:border-slate-800/50 transition-colors">Based on your currently deployed capital and exact dividend schedules.</p>
+                    
+                    <div id="unscheduled-bucket" class="hidden glass-panel p-4 rounded-xl border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-900/10 mb-2 relative z-10 transition-colors">
+                        <h3 class="text-xs font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest mb-2 flex items-center gap-2 transition-colors">⚠️ Unscheduled Assets</h3>
+                        <p class="text-[10px] text-slate-600 dark:text-slate-400 mb-3 transition-colors">The following active holdings do not have a schedule set. Please return to the Allocator to toggle their payout months.</p>
+                        <div id="unscheduled-list" class="flex flex-wrap gap-2 relative z-10"></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 relative z-10" id="cal-grid">
+                        </div>
+                    
+                    <div class="glass-panel p-6 rounded-xl mt-4 bg-slate-50/50 dark:bg-slate-900/10 border-slate-200 dark:border-slate-800/50 w-full text-center relative z-10 transition-colors">
+                        <p class="text-xs text-slate-500 dark:text-slate-500 italic transition-colors">Disclaimer: These figures are forward-looking projections based on your manual inputs. Actual dividend payouts, yields, and schedules are subject to board declarations and market conditions.</p>
+                    </div>
+                </div>
+
+                <div id="view-guidebook" class="w-full max-w-4xl mx-auto flex flex-col gap-8 hidden relative z-10">
+                    <div class="text-center mb-4 mt-6">
+                        <h2 class="text-3xl font-black tracking-tight text-slate-900 dark:text-white mb-3">The Guidebook</h2>
+                        <p class="text-slate-500 dark:text-slate-400">Master your portfolio, understand the mechanics, and grow your wealth.</p>
+                    </div>
+
+                    <div class="glass-panel rounded-3xl p-6 sm:p-8 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                        <h3 class="text-xs font-bold text-blue-500 uppercase tracking-widest mb-4">Part 1: The Purpose</h3>
+                        <p class="text-sm leading-relaxed text-slate-700 dark:text-slate-300">The MT Dividend Sandbox is your risk-free financial terminal. It is designed to act as a dual-purpose engine: it tracks the exact cash flow and allocations of your real-world dividend assets, while simultaneously simulating decades of compound growth so you can map out your financial independence.</p>
+                    </div>
+
+                    <div class="glass-panel rounded-3xl p-6 sm:p-8 relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl -ml-10 -mt-10"></div>
+                        <h3 class="text-xs font-bold text-purple-500 uppercase tracking-widest mb-6">Part 2: The Pillars & Operations</h3>
+                        <div class="space-y-8">
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">1. The Dashboard (Global View)</h4>
+                                <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400"><span class="font-semibold text-slate-700 dark:text-slate-300">Purpose:</span> A bird's-eye view of your entire wealth.<br><span class="font-semibold text-slate-700 dark:text-slate-300">Operation:</span> This tab is strictly read-only. It automatically parses all data from your Ledgers and Allocator to build visual charts, track unrealized PnL, and summarize your holdings.</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">2. The Allocator (The Trading Desk)</h4>
+                                <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400"><span class="font-semibold text-slate-700 dark:text-slate-300">Purpose:</span> Where you execute buy/sell orders and input market data.<br><span class="font-semibold text-slate-700 dark:text-slate-300">Operation:</span> Input the ticker, dividend per share, and market price. Toggle the "BUY" or "SELL" buttons to reveal the order ticket. If a company announces a new dividend, simply update the Div Per Share field, leave the ticket on "HOLD", and click the commit button to instantly update your portfolio yield without selling.</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">3. The Ledgers (The Bank)</h4>
+                                <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400"><span class="font-semibold text-slate-700 dark:text-slate-300">Purpose:</span> The immutable history of your cash and trades.<br><span class="font-semibold text-slate-700 dark:text-slate-300">Operation:</span> Click "+ Manage Funds" to inject or withdraw virtual cash. To reverse a mistake, simply click the "✕" on any ledger row to mathematically reverse the cash and share impact.</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">4. Projections (The Time Machine)</h4>
+                                <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400"><span class="font-semibold text-slate-700 dark:text-slate-300">Purpose:</span> A sandbox within the sandbox to simulate decades of compound growth based on your current real-world portfolio.<br><span class="font-semibold text-slate-700 dark:text-slate-300">Operation:</span> Slide the "Stop Age" to map out Coast FIRE (when you stop adding new money). The engine dynamically tells you exactly what monthly top-up you need to achieve your Retirement Income Goal.</p>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">5. Div Calendar (Cash Flow Mapping)</h4>
+                                <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400"><span class="font-semibold text-slate-700 dark:text-slate-300">Purpose:</span> Visualizing exactly when you get paid.<br><span class="font-semibold text-slate-700 dark:text-slate-300">Operation:</span> Go to the Allocator tab, find your stock, and click the months under "Payout Schedule". The Calendar will instantly build a month-by-month cash flow map. You can also toggle to view how massive these monthly payouts will become by your retirement age.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel rounded-3xl p-6 sm:p-8 relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-32 h-32 bg-brand/10 rounded-full blur-3xl -ml-10 -mt-10"></div>
+                        <h3 class="text-xs font-bold text-brand uppercase tracking-widest mb-6">Part 3: The Wealth Playbook</h3>
+                        <div class="space-y-8">
+                            <div>
+                                <h4 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-2">🔄 The Power of Reinvestment</h4>
+                                <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400">Getting paid dividends is great. Using those dividends to buy <em>more</em> shares is where wealth is actually built. When your dividends buy more shares, those new shares pay you even more dividends next year. The Sandbox assumes you are strictly reinvesting 100% of your payouts. That’s what turns a flat savings account into a parabolic, exponential curve.</p>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-2">📈 The Yield Reality (Don't fall for the trap)</h4>
+                                <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400">In the Philippine market, good businesses are remarkably consistent. A <strong>5% to 7%</strong> dividend yield is perfectly reasonable, and even 8% can be very safe if the business is strong. However, chasing a huge yield (like 12% or 15%) is often dangerous. Usually, an abnormally high yield means the stock price has crashed because the underlying business is failing. A solid 5-6% yield paired with consistent, boring top-ups is how you win the game safely.</p>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-2">💧 Consistency over Timing</h4>
+                                <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400">The <em>Planned Top-Up</em> slider in the Projections tab is your most powerful tool. You don't need to perfectly time the bottom of the market. Adding a little bit of fresh capital every single month—whether the market is red or green—smooths out your average cost and massively accelerates your timeline. Boring, consistent investing creates exciting, life-changing wealth.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div class="lg:hidden fixed bottom-0 left-0 w-full bg-white/80 dark:bg-slate-850/80 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-800/50 z-50 flex justify-around px-2 pb-4 pt-2 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] transition-colors">
+            <button onclick="switchMainView('dashboard')" id="mob-nav-dashboard" class="flex flex-col items-center justify-center p-2 text-brand transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+                <span class="text-[9px] font-bold mt-1">Dash</span>
+            </button>
+            <button onclick="switchMainView('allocator')" id="mob-nav-allocator" class="flex flex-col items-center justify-center p-2 text-slate-500 dark:text-slate-400 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                <span class="text-[9px] font-bold mt-1">Trade</span>
+            </button>
+            <button onclick="switchMainView('ledgers')" id="mob-nav-ledgers" class="flex flex-col items-center justify-center p-2 text-slate-500 dark:text-slate-400 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                <span class="text-[9px] font-bold mt-1">Logs</span>
+            </button>
+            <button onclick="switchMainView('projections')" id="mob-nav-projections" class="flex flex-col items-center justify-center p-2 text-slate-500 dark:text-slate-400 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                <span class="text-[9px] font-bold mt-1">Sandbox</span>
+            </button>
+            <button onclick="switchMainView('calendar')" id="mob-nav-calendar" class="flex flex-col items-center justify-center p-2 text-slate-500 dark:text-slate-400 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z"></path></svg>
+                <span class="text-[9px] font-bold mt-1">Calendar</span>
+            </button>
+            <button onclick="switchMainView('guidebook')" id="mob-nav-guidebook" class="flex flex-col items-center justify-center p-2 text-slate-500 dark:text-slate-400 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                <span class="text-[9px] font-bold mt-1">Guide</span>
+            </button>
+        </div>
+    </div>
+<script type="module" src="engine.js"></script>
+</body>
+</html>
