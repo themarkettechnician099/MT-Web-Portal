@@ -45,11 +45,7 @@ async function loadCloudProfile() {
                 if (state.ledger && state.ledger.length > 0) {
                     document.getElementById('init-modal').classList.add('hidden');
                     runEngine();
-                    populateStrategyDropdowns();
-                    renderWlTabs();
-                    if(state.watchlist.length > 0) {
-                        loadWlTab(state.activeWlId);
-                    }
+                    initPlanner();
                     switchView('dashboard');
                 } else {
                     console.log("Empty save. Forcing Welcome Screen.");
@@ -1836,6 +1832,17 @@ function closeLedger() {
     setTimeout(() => modal.classList.add('hidden'), 300); 
 }
 
+function handleImageUpload(e) {
+    if(e.target.files.length > 0) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            state.watchlist.find(w => w.id === state.activeWlId).image = ev.target.result;
+            loadWlTab(state.activeWlId);
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    }
+}
+
 window.addEventListener('paste', e => {
     if(document.getElementById('view-allocator').classList.contains('hidden')) return;
     
@@ -1917,3 +1924,10 @@ window.clearImage = clearImage;
 window.viewImage = viewImage;
 window.closeImage = closeImage;
 window.formatNumberInput = formatNumberInput;
+window.updateTranche = updateTranche;
+window.updateStop = updateStop;
+window.updateTarget = updateTarget;
+window.limitPosSize = limitPosSize;
+window.handleMktPriceInput = handleMktPriceInput;
+window.handleGalleryUpload = handleGalleryUpload;
+window.handleImageUpload = handleImageUpload;
