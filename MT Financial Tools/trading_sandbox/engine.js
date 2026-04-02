@@ -896,6 +896,7 @@ function loadWlTab(id) {
     if(document.getElementById('w-stop-type')) document.getElementById('w-stop-type').value = wl.stopType || '100'; 
     if(document.getElementById('w-target-type')) document.getElementById('w-target-type').value = wl.targetType || '100'; 
     
+    // Explicitly draw the boxes when the tab loads
     changeTrancheType(wl.trancheType, false);
     changeStopType(wl.stopType, false);
     changeTargetType(wl.targetType, false);
@@ -959,6 +960,7 @@ function changeTrancheType(type, clear = true) {
 function updateTranche(idx, val) { 
     const wl = state.watchlist.find(w => w.id === state.activeWlId);
     if (!wl) return;
+    // Aggressive sanitization: convert to number or default to 0
     wl.entries[idx] = parseFloat(val) || 0; 
     calcPlanner(); 
 }
