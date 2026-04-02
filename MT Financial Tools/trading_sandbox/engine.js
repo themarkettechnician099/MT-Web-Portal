@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // ==========================================
-// 0. FIREBASE INTEGRATION
+// 0. FIREBASE INTEGRATION & LOADING UX
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyDvANibal59STlmeA6jKwKOPc_6XFtq30A",
@@ -18,6 +18,16 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 let currentUser = null;
+
+// Psychological Loading Screen: Kickoff Animation
+document.addEventListener('DOMContentLoaded', () => {
+    const progress = document.getElementById('loading-progress');
+    if (progress) {
+        setTimeout(() => {
+            progress.style.width = '92%';
+        }, 50);
+    }
+});
 
 // Firebase Auth State Observer
 onAuthStateChanged(auth, (user) => {
@@ -75,6 +85,18 @@ function healState() {
 }
 
 async function loadCloudProfile() {
+    const finishLoad = () => {
+        const progress = document.getElementById('loading-progress');
+        const screen = document.getElementById('loading-screen');
+        if (progress) progress.style.width = '100%';
+        setTimeout(() => {
+            if (screen) {
+                screen.classList.add('opacity-0');
+                setTimeout(() => screen.classList.add('hidden'), 300);
+            }
+        }, 400); // Linger for structural feel
+    };
+
     try {
         const docRef = doc(db, 'users', currentUser.uid);
         const docSnap = await getDoc(docRef);
@@ -108,6 +130,9 @@ async function loadCloudProfile() {
         }
     } catch (error) {
         console.error("Error loading cloud data:", error);
+        document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+    } finally {
+        finishLoad(); // Gracefully close loading screen regardless of outcome
     }
 }
 
@@ -2125,14 +2150,69 @@ function closeImage() {
     setTimeout(() => document.getElementById('image-modal').classList.add('hidden'), 200); 
 }
 
-async function saveData() { 
+async function saveData(btn = null) { 
     if (!currentUser) return;
+    
+    let originalText = "";
+    if (btn) {
+        originalText = btn.innerText;
+        btn.innerText = "Syncing...";
+        btn.disabled = true;
+    }
+
     try {
         await setDoc(doc(db, 'users', currentUser.uid), { tradingSandboxState: state }, { merge: true });
         console.log("State silently pushed to Firestore.");
+        
+        if (btn) {
+            btn.innerText = "Saved! ✓";
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }, 2000);
+        }
     } catch(e) {
         console.error("Error saving data:", e);
+        if (btn) {
+            btn.innerText = "Error!";
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }, 2000);
+        }
     }
+}
+
+async function saveAndExit() {
+    const screen = document.getElementById('loading-screen');
+    const progress = document.getElementById('loading-progress');
+    
+    if(screen) {
+        screen.classList.remove('hidden');
+        setTimeout(() => screen.classList.remove('opacity-0'), 10);
+    }
+    
+    if(progress) {
+        progress.style.transition = 'none';
+        progress.style.width = '0%';
+        setTimeout(() => {
+            progress.style.transition = 'all 1000ms ease-out';
+            progress.style.width = '95%';
+        }, 50);
+    }
+
+    if (currentUser) {
+        try {
+            await setDoc(doc(db, 'users', currentUser.uid), { tradingSandboxState: state }, { merge: true });
+        } catch(e) {
+            console.error("Error saving before exit:", e);
+        }
+    }
+    
+    if(progress) progress.style.width = '100%';
+    setTimeout(() => {
+        window.location.href = '../index.html';
+    }, 300);
 }
 
 // ==========================================
@@ -2146,6 +2226,7 @@ window.checkResetCode = checkResetCode;
 window.switchView = switchView;
 window.undo = undo;
 window.saveData = saveData;
+window.saveAndExit = saveAndExit;
 window.updateWl = updateWl;
 window.changeTrancheType = changeTrancheType;
 window.changeStopType = changeStopType;
