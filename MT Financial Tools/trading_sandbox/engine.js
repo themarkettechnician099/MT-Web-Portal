@@ -29,23 +29,32 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// V2.14 Defensive Architecture: Actively heals missing or corrupted arrays
+// V2.14 INDESTRUCTIBLE HEALER: Fixes the Firebase Sparse Array Bug
 function healState() {
-    if (!state.strategies || state.strategies.length === 0) {
-        state.strategies = ['Breakout', 'Bounce Play', 'Swing'];
-    }
-    if (!state.activeHoldings) state.activeHoldings = [];
-    if (!state.watchlist) state.watchlist = [];
-    if (!state.journal) state.journal = [];
-    if (!state.ledger) state.ledger = [];
+    const enforceArray = (data, defaultData) => {
+        if (!data) return defaultData;
+        if (Array.isArray(data)) return data;
+        if (typeof data === 'object') return Object.values(data); // Rescues corrupted Firebase objects
+        return defaultData;
+    };
+
+    state.strategies = enforceArray(state.strategies, ['Breakout', 'Bounce Play', 'Swing']);
+    if (state.strategies.length === 0) state.strategies = ['Breakout', 'Bounce Play', 'Swing'];
+
+    state.activeHoldings = enforceArray(state.activeHoldings, []);
+    state.watchlist = enforceArray(state.watchlist, []);
+    state.journal = enforceArray(state.journal, []);
+    state.ledger = enforceArray(state.ledger, []);
 
     state.watchlist.forEach(wl => {
-        if (!wl.trancheType) wl.trancheType = '100';
-        if (!wl.stopType) wl.stopType = '100';
-        if (!wl.targetType) wl.targetType = '100';
-        if (!wl.entries) wl.entries = [0, 0, 0];
-        if (!wl.stopEntries) wl.stopEntries = [0, 0];
-        if (!wl.targetEntries) wl.targetEntries = [0, 0];
+        if (!['100', '50-50', '50-30-20'].includes(wl.trancheType)) wl.trancheType = '100';
+        if (!['100', '50-50'].includes(wl.stopType)) wl.stopType = '100';
+        if (!['100', '50-50'].includes(wl.targetType)) wl.targetType = '100';
+
+        wl.entries = enforceArray(wl.entries, [0, 0, 0]);
+        wl.stopEntries = enforceArray(wl.stopEntries, [0, 0]);
+        wl.targetEntries = enforceArray(wl.targetEntries, [0, 0]);
+        
         if (!wl.setup) wl.setup = state.strategies[0];
         if (!wl.sector) wl.sector = 'Others';
         if (!wl.maxPosPct) wl.maxPosPct = 25;
@@ -53,14 +62,14 @@ function healState() {
     });
     
     state.activeHoldings.forEach(pos => {
-        if (!pos.targetType) pos.targetType = '100';
-        if (!pos.stopType) pos.stopType = '100';
-        if (!pos.targetEntries) pos.targetEntries = [0, 0];
-        if (!pos.stopEntries) pos.stopEntries = [0, 0];
+        if (!['100', '50-50'].includes(pos.targetType)) pos.targetType = '100';
+        if (!['100', '50-50'].includes(pos.stopType)) pos.stopType = '100';
+        
+        pos.targetEntries = enforceArray(pos.targetEntries, [0, 0]);
+        pos.stopEntries = enforceArray(pos.stopEntries, [0, 0]);
     });
 }
 
-// THE OVERHAUL: Strict Binary Load
 async function loadCloudProfile() {
     try {
         const docRef = doc(db, 'users', currentUser.uid);
@@ -69,21 +78,18 @@ async function loadCloudProfile() {
         if (docSnap.exists()) {
             const data = docSnap.data();
             
-            // Legacy rescue included
             const cloudState = data.tradingSandboxState || data.appNameState || data.state;
             
             if (cloudState) {
                 state = cloudState;
                 healState();
                 
-                // If they have a ledger, let them in.
                 if (state.ledger && state.ledger.length > 0) {
                     document.getElementById('init-modal').classList.add('hidden');
                     runEngine();
                     initPlanner();
                     switchView('dashboard');
                 } else {
-                    // If ledger is empty, force Capital Input screen
                     console.log("Empty ledger. Forcing Welcome Screen.");
                     document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
                 }
@@ -149,7 +155,6 @@ function limitPosSize(input) {
 // ==========================================
 // 2. MASTER STATE MANAGEMENT
 // ==========================================
-// THE OVERHAUL: Completely Empty Default State
 let state = {
     ledger: [],
     strategies: ['Breakout', 'Bounce Play', 'Swing'],
@@ -285,7 +290,6 @@ function checkResetCode(val) {
     }
 }
 
-// THE OVERHAUL: Hard Wipe and Browser Refresh
 async function executeNuclearReset() {
     state = {
         ledger: [],
@@ -307,7 +311,6 @@ async function executeNuclearReset() {
     window.location.reload();
 }
 
-// THE OVERHAUL: Initial Capital Setup and Auto-Save
 function confirmReset() {
     const rawCap = getRawValue(document.getElementById('init-capital').value);
     if(rawCap <= 0) return alert('Enter a valid starting capital amount.');
@@ -332,7 +335,7 @@ function confirmReset() {
     runEngine(); 
     initPlanner(); 
     switchView('dashboard');
-    saveData(); // Auto-save initial capital to cloud
+    saveData();
 }
 
 // ==========================================
@@ -916,7 +919,8 @@ function loadWlTab(id) {
 }
 
 function updateWl(key, val) { 
-    const wl = state.watchlist.find(w => w.id === state.activeWlId); 
+    const wl = state.watchlist.find(w => w.id === state.activeWlId);
+    if (!wl) return;
     wl[key] = (key === 'ticker' || key === 'setup' || key === 'sector') ? val : (parseFloat(val) || 0); 
     if (key === 'ticker') renderWlTabs(); 
     calcPlanner(); 
@@ -924,6 +928,7 @@ function updateWl(key, val) {
 
 function changeTrancheType(type, clear = true) {
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
+    if (!wl) return;
     wl.trancheType = type; 
     if (clear) wl.entries = [0, 0, 0];
     
@@ -952,12 +957,15 @@ function changeTrancheType(type, clear = true) {
 }
 
 function updateTranche(idx, val) { 
-    state.watchlist.find(w => w.id === state.activeWlId).entries[idx] = parseFloat(val) || 0; 
+    const wl = state.watchlist.find(w => w.id === state.activeWlId);
+    if (!wl) return;
+    wl.entries[idx] = parseFloat(val) || 0; 
     calcPlanner(); 
 }
 
 function changeStopType(type, clear = true) {
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
+    if (!wl) return;
     wl.stopType = type; 
     if (clear) wl.stopEntries = [0, 0];
     
@@ -985,12 +993,15 @@ function changeStopType(type, clear = true) {
 }
 
 function updateStop(idx, val) { 
-    state.watchlist.find(w => w.id === state.activeWlId).stopEntries[idx] = parseFloat(val) || 0; 
+    const wl = state.watchlist.find(w => w.id === state.activeWlId);
+    if (!wl) return;
+    wl.stopEntries[idx] = parseFloat(val) || 0; 
     calcPlanner(); 
 }
 
 function changeTargetType(type, clear = true) {
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
+    if (!wl) return;
     wl.targetType = type; 
     if (clear) wl.targetEntries = [0, 0];
     
@@ -1018,7 +1029,9 @@ function changeTargetType(type, clear = true) {
 }
 
 function updateTarget(idx, val) { 
-    state.watchlist.find(w => w.id === state.activeWlId).targetEntries[idx] = parseFloat(val) || 0; 
+    const wl = state.watchlist.find(w => w.id === state.activeWlId);
+    if (!wl) return;
+    wl.targetEntries[idx] = parseFloat(val) || 0; 
     calcPlanner(); 
 }
 
@@ -1286,7 +1299,7 @@ function executeTrade() {
     runEngine(); 
     loadWlTab(freshWl.id); 
     switchView('dashboard'); 
-    saveData(); // THE OVERHAUL: Auto-Save
+    saveData();
 }
 
 // ==========================================
@@ -1463,7 +1476,7 @@ function confirmCloseTrade() {
 
         hideCloseModal(); 
         runEngine(); 
-        saveData(); // THE OVERHAUL: Auto-Save
+        saveData();
     } 
 }
 
@@ -1473,7 +1486,7 @@ function deleteJournalEntry(id) {
         state.journal.splice(idx, 1); 
         runEngine(); 
         renderLedgers(); 
-        saveData(); // Added Auto-Save to deletions as well
+        saveData();
     } 
 }
 
@@ -1505,7 +1518,7 @@ function submitLedger() {
     runEngine(); 
     calcPlanner(); 
     renderLedgers(); 
-    saveData(); // THE OVERHAUL: Auto-Save
+    saveData();
 }
 
 // ==========================================
