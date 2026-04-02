@@ -862,7 +862,7 @@ function renderHoldingsGallery(masterCapital) {
                     </div>
                     
                     <div class="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 flex justify-between items-center border border-slate-200 dark:border-slate-800">
-                        <button onclick="openCloseModal(${pos.id})" class="px-5 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white rounded font-black tracking-wider text-[10px] transition-all shadow-sm">CLOSE</button>
+                        <button onclick="openCloseModal(${pos.id})" class="px-5 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-50 hover:text-white rounded font-black tracking-wider text-[10px] transition-all shadow-sm">CLOSE</button>
                         <div class="text-right">
                             <span class="block font-black ${pnlColor}" id="g-pnl-${pos.id}">${pnlSign}${fmtPHP(pos.unrealizedPnl)}</span>
                             <span class="block text-[10px] font-bold ${pnlColor}" id="g-pnlpct-${pos.id}">${pnlSign}${pos.pnlPct.toFixed(2)}%</span>
@@ -1358,6 +1358,12 @@ function calcTicketFromShares() {
             warnBox.classList.remove('hidden'); 
             actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
             wl.valid = false; 
+            
+            // Clear summary on error
+            const summP1 = document.getElementById('summary-p1');
+            const summP2 = document.getElementById('summary-p2');
+            if(summP1) summP1.innerHTML = "Awaiting valid trade parameters to generate summary...";
+            if(summP2) summP2.innerHTML = "";
             return; 
         }
 
@@ -1367,11 +1373,20 @@ function calcTicketFromShares() {
             warnBox.classList.remove('hidden'); 
             actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
             wl.valid = false; 
+            
+            const summP1 = document.getElementById('summary-p1');
+            const summP2 = document.getElementById('summary-p2');
+            if(summP1) summP1.innerHTML = "Awaiting valid trade parameters to generate summary...";
+            if(summP2) summP2.innerHTML = "";
             return; 
         }
         
         if (!wl.computedAEP || !wl.computedStop || !wl.ticker) { 
             actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
+            const summP1 = document.getElementById('summary-p1');
+            const summP2 = document.getElementById('summary-p2');
+            if(summP1) summP1.innerHTML = "Awaiting valid trade parameters to generate summary...";
+            if(summP2) summP2.innerHTML = "";
             return; 
         }
         
@@ -1379,6 +1394,10 @@ function calcTicketFromShares() {
             warnBox.innerText = "Stop Loss must be below Entry!"; 
             warnBox.className = "absolute top-0 left-0 w-full bg-red-600/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
             warnBox.classList.remove('hidden'); 
+            const summP1 = document.getElementById('summary-p1');
+            const summP2 = document.getElementById('summary-p2');
+            if(summP1) summP1.innerHTML = "Awaiting valid trade parameters to generate summary...";
+            if(summP2) summP2.innerHTML = "";
             return; 
         }
         
@@ -1387,6 +1406,10 @@ function calcTicketFromShares() {
             warnBox.className = "absolute top-0 left-0 w-full bg-amber-500/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
             warnBox.classList.remove('hidden'); 
             actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
+            const summP1 = document.getElementById('summary-p1');
+            const summP2 = document.getElementById('summary-p2');
+            if(summP1) summP1.innerHTML = "Awaiting valid trade parameters to generate summary...";
+            if(summP2) summP2.innerHTML = "";
             return; 
         }
 
@@ -1415,6 +1438,26 @@ function calcTicketFromShares() {
         if(document.getElementById('o-impact-win')) document.getElementById('o-impact-win').innerText = `+${winImpactPct.toFixed(2)}% Acct Impact`; 
         if(document.getElementById('o-rr')) document.getElementById('o-rr').innerText = `${rr.toFixed(2)} R`;
         
+        // ==========================================
+        // NEW PATCH: TRADE SUMMARY NARRATIVE GENERATOR
+        // ==========================================
+        const summP1 = document.getElementById('summary-p1');
+        const summP2 = document.getElementById('summary-p2');
+        
+        if (summP1 && summP2) {
+            if (wl.shares > 0 && wl.computedAEP > 0 && wl.computedStop > 0) {
+                summP1.innerHTML = `You are planning to buy <b class="text-slate-900 dark:text-white">${wl.shares.toLocaleString()}</b> shares of <b class="text-slate-900 dark:text-white">${wl.ticker || 'ASSET'}</b> at an average entry price of <b class="text-slate-900 dark:text-white">₱${fmtDec(wl.computedAEP)}</b>. Your average cut loss price is set at <b class="text-red-500">₱${fmtDec(wl.computedStop)}</b>, and your average target price is <b class="text-brand">₱${fmtDec(wl.computedTarget)}</b>.`;
+
+                summP2.innerHTML = `This setup requires a total capital deployment of <b class="text-slate-900 dark:text-white">${fmtPHP(wl.cost)}</b>, representing <b class="text-slate-900 dark:text-white">${allocPct.toFixed(2)}%</b> of your total portfolio. Based on your <b class="text-slate-900 dark:text-white">${wl.varPct || 1}%</b> VaR limit, your maximum risk is strictly contained to <b class="text-red-500">-${fmtPHP(actualRisk)}</b> (<b class="text-red-500">-${lossImpactPct.toFixed(2)}%</b> account impact). If the trade reaches its target, you will secure <b class="text-brand">+${fmtPHP(projProfit)}</b> in profit (<b class="text-brand">+${winImpactPct.toFixed(2)}%</b> account growth).`;
+            } else {
+                summP1.innerHTML = "Awaiting valid trade parameters to generate summary...";
+                summP2.innerHTML = "";
+            }
+        }
+        // ==========================================
+        // END OF PATCH
+        // ==========================================
+
         if (wl.shares > 0) {
             const bl = getBoardLot(wl.computedAEP); 
             
