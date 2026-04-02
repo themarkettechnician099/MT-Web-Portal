@@ -156,6 +156,40 @@ function limitPosSize(input) {
     }
 }
 
+// IMAGE COMPRESSOR ENGINE: Prevents 1MB Firebase Document Bloat
+function compressChartImage(dataUrl, callback) {
+    const img = new Image();
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800; // Optimal limit for chart viewing
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+            if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+            }
+        } else {
+            if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+            }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Crush to JPEG at 50% quality to save massive database space
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.5);
+        callback(compressedDataUrl);
+    };
+    img.src = dataUrl;
+}
+
 // ==========================================
 // 2. MASTER STATE MANAGEMENT
 // ==========================================
@@ -818,13 +852,15 @@ function handleGalleryUpload(e, id) {
     if(e.target.files.length > 0) {
         const reader = new FileReader();
         reader.onload = (ev) => {
-            if (!Array.isArray(state.activeHoldings)) return;
-            const pos = state.activeHoldings.find(p => p.id === id);
-            if (pos) {
-                pos.image = ev.target.result;
-                saveState();
-                runEngine(false); 
-            }
+            compressChartImage(ev.target.result, (compressedImg) => {
+                if (!Array.isArray(state.activeHoldings)) return;
+                const pos = state.activeHoldings.find(p => p.id === id);
+                if (pos) {
+                    pos.image = compressedImg;
+                    saveState();
+                    runEngine(false); 
+                }
+            });
         };
         reader.readAsDataURL(e.target.files[0]);
     }
@@ -882,7 +918,8 @@ const createEmptyWl = (id) => ({
     trancheType: '100', entries: [0, 0, 0], computedAEP: 0,
     stopType: '100', stopEntries: [0, 0], computedStop: 0,
     targetType: '100', targetEntries: [0, 0], computedTarget: 0,
-    shares: 0, cost: 0, valid: false, isTrancheValid: false 
+    shares: 0, cost: 0, valid: false, isTrancheValid: false,
+    image: null // Firebase safeguard
 });
 
 function populateStrategyDropdowns() {
@@ -1417,7 +1454,7 @@ function executeTrade() {
         shares: wl.shares, 
         avgCost: wl.computedAEP, 
         currentPrice: wl.computedAEP, 
-        image: wl.image,
+        image: wl.image || null, // FIREBASE SAFEGUARD
         targetType: wl.targetType,
         targetEntries: [...(wl.targetEntries || [0,0])],
         stopType: wl.stopType,
@@ -2034,12 +2071,14 @@ function handleImageUpload(e) {
     if(e.target.files.length > 0) {
         const reader = new FileReader();
         reader.onload = (ev) => {
-            if(!Array.isArray(state.watchlist)) return;
-            const wl = state.watchlist.find(w => w.id === state.activeWlId);
-            if(wl) {
-                wl.image = ev.target.result;
-                loadWlTab(state.activeWlId);
-            }
+            compressChartImage(ev.target.result, (compressedImg) => {
+                if(!Array.isArray(state.watchlist)) return;
+                const wl = state.watchlist.find(w => w.id === state.activeWlId);
+                if(wl) {
+                    wl.image = compressedImg;
+                    loadWlTab(state.activeWlId);
+                }
+            });
         };
         reader.readAsDataURL(e.target.files[0]);
     }
@@ -2051,12 +2090,14 @@ window.addEventListener('paste', e => {
     if(e.clipboardData.files.length > 0 && e.clipboardData.files[0].type.startsWith('image/')) { 
         const reader = new FileReader(); 
         reader.onload = (ev) => { 
-            if(!Array.isArray(state.watchlist)) return;
-            const wl = state.watchlist.find(w => w.id === state.activeWlId);
-            if(wl) {
-                wl.image = ev.target.result; 
-                loadWlTab(state.activeWlId); 
-            }
+            compressChartImage(ev.target.result, (compressedImg) => {
+                if(!Array.isArray(state.watchlist)) return;
+                const wl = state.watchlist.find(w => w.id === state.activeWlId);
+                if(wl) {
+                    wl.image = compressedImg; 
+                    loadWlTab(state.activeWlId); 
+                }
+            });
         }; 
         reader.readAsDataURL(e.clipboardData.files[0]); 
     }
@@ -2137,3 +2178,4 @@ window.limitPosSize = limitPosSize;
 window.handleMktPriceInput = handleMktPriceInput;
 window.handleGalleryUpload = handleGalleryUpload;
 window.handleImageUpload = handleImageUpload;
+window.compressChartImage = compressChartImage;
