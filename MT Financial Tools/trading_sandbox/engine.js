@@ -34,7 +34,6 @@ function healState() {
     const enforceArray = (data, defaultData) => {
         if (!data) return defaultData;
         if (Array.isArray(data)) {
-            // Further sanitize: remove nulls/undefined from sparse arrays
             return data.filter(item => item !== null && item !== undefined);
         }
         if (typeof data === 'object') {
@@ -177,9 +176,8 @@ function saveState() {
     if (isUndoAction) return;
     undoStack.push(JSON.stringify(state));
     if (undoStack.length > 10) undoStack.shift();
-    document.getElementById('btn-undo').disabled = false;
-    const mobUndo = document.getElementById('mob-btn-undo');
-    if (mobUndo) mobUndo.disabled = false;
+    if(document.getElementById('btn-undo')) document.getElementById('btn-undo').disabled = false;
+    if(document.getElementById('mob-btn-undo')) document.getElementById('mob-btn-undo').disabled = false;
 }
 
 function undo() {
@@ -189,9 +187,8 @@ function undo() {
     healState();
     
     if (undoStack.length === 0) {
-        document.getElementById('btn-undo').disabled = true;
-        const mobUndo = document.getElementById('mob-btn-undo');
-        if (mobUndo) mobUndo.disabled = true;
+        if(document.getElementById('btn-undo')) document.getElementById('btn-undo').disabled = true;
+        if(document.getElementById('mob-btn-undo')) document.getElementById('mob-btn-undo').disabled = true;
     }
     
     runEngine(); 
@@ -222,7 +219,7 @@ function switchView(view) {
         }
     });
     
-    document.getElementById(`view-${view}`).classList.remove('hidden');
+    if(document.getElementById(`view-${view}`)) document.getElementById(`view-${view}`).classList.remove('hidden');
     
     const targetDesk = document.getElementById(`nav-${view}`);
     if(targetDesk) targetDesk.classList.add('active');
@@ -231,9 +228,9 @@ function switchView(view) {
     if(targetMob) { targetMob.classList.add('active', 'border-t-brand', 'text-brand'); }
     
     if(view === 'guidebook') {
-        document.getElementById('command-center').classList.add('hidden');
+        if(document.getElementById('command-center')) document.getElementById('command-center').classList.add('hidden');
     } else {
-        document.getElementById('command-center').classList.remove('hidden');
+        if(document.getElementById('command-center')) document.getElementById('command-center').classList.remove('hidden');
     }
     
     setTimeout(() => {
@@ -266,28 +263,29 @@ function openResetModal() {
     const btn = document.getElementById('btn-confirm-reset');
     
     currentSecurityCode = Math.floor(100 + Math.random() * 900).toString();
-    document.getElementById('reset-code-display').innerText = currentSecurityCode;
+    if(document.getElementById('reset-code-display')) document.getElementById('reset-code-display').innerText = currentSecurityCode;
     
-    input.value = '';
-    btn.disabled = true;
+    if(input) input.value = '';
+    if(btn) btn.disabled = true;
     
-    modal.classList.remove('hidden');
+    if(modal) modal.classList.remove('hidden');
     setTimeout(() => { 
-        modal.classList.remove('opacity-0'); 
-        content.classList.remove('scale-95'); 
+        if(modal) modal.classList.remove('opacity-0'); 
+        if(content) content.classList.remove('scale-95'); 
     }, 10);
 }
 
 function hideResetModal() {
     const modal = document.getElementById('reset-modal');
     const content = document.getElementById('reset-content');
-    modal.classList.add('opacity-0'); 
-    content.classList.add('scale-95'); 
-    setTimeout(() => modal.classList.add('hidden'), 300);
+    if(modal) modal.classList.add('opacity-0'); 
+    if(content) content.classList.add('scale-95'); 
+    setTimeout(() => { if(modal) modal.classList.add('hidden'); }, 300);
 }
 
 function checkResetCode(val) {
     const btn = document.getElementById('btn-confirm-reset');
+    if(!btn) return;
     if (val.trim() === currentSecurityCode) {
         btn.disabled = false;
     } else {
@@ -334,8 +332,10 @@ function confirmReset() {
     
     healState();
     
-    document.getElementById('init-modal').classList.add('opacity-0', 'pointer-events-none');
-    setTimeout(() => document.getElementById('init-modal').classList.add('hidden'), 300);
+    if(document.getElementById('init-modal')) {
+        document.getElementById('init-modal').classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => document.getElementById('init-modal').classList.add('hidden'), 300);
+    }
     
     runEngine(); 
     initPlanner(); 
@@ -456,7 +456,8 @@ function runEngine(skipGallery = false) {
             
             globalActualStats.posSizePct = state.journal.reduce((s,t) => s + (t.posSizePct !== undefined ? t.posSizePct : 0), 0) / total;
         } else {
-            globalActualStats = { wr: 0, avgGainPct: 0, avgLossPct: 0, posSizePct: 0 };
+            // Restore sandbox defaults so projections work immediately
+            globalActualStats = { wr: 0.40, avgGainPct: 0.08, avgLossPct: -0.05, posSizePct: 0.20 };
         }
 
         updateDials();
@@ -484,29 +485,36 @@ let stratChart = null;
 let sectorDoughnut = null;
 let strategyDoughnut = null;
 
+// THE SVG FIX: Safely assign attributes to prevent crashes
 function updateDials() {
-    const wr = globalActualStats.wr * 100;
-    const ag = globalActualStats.avgGainPct * 100;
-    const al = globalActualStats.avgLossPct * 100;
+    try {
+        const wr = globalActualStats.wr * 100;
+        const ag = globalActualStats.avgGainPct * 100;
+        const al = globalActualStats.avgLossPct * 100;
 
-    if(document.getElementById('gauge-wr-text')) document.getElementById('gauge-wr-text').innerText = `${wr.toFixed(1)}%`;
-    if(document.getElementById('gauge-ag-text')) document.getElementById('gauge-ag-text').innerText = `+${ag.toFixed(1)}%`;
-    if(document.getElementById('gauge-al-text')) document.getElementById('gauge-al-text').innerText = `${al.toFixed(1)}%`;
-    
-    if(document.getElementById('gauge-wr-text')) document.getElementById('gauge-wr-text').className = `text-2xl font-mono font-black ${wr >= 50 ? 'text-brand' : 'text-amber-500'}`;
-    if(document.getElementById('gauge-wr-path')) document.getElementById('gauge-wr-path').className = wr >= 50 ? 'text-brand' : 'text-amber-500';
+        if(document.getElementById('gauge-wr-text')) document.getElementById('gauge-wr-text').innerText = `${wr.toFixed(1)}%`;
+        if(document.getElementById('gauge-ag-text')) document.getElementById('gauge-ag-text').innerText = `+${ag.toFixed(1)}%`;
+        if(document.getElementById('gauge-al-text')) document.getElementById('gauge-al-text').innerText = `${al.toFixed(1)}%`;
+        
+        if(document.getElementById('gauge-wr-text')) document.getElementById('gauge-wr-text').className = `text-2xl font-mono font-black ${wr >= 50 ? 'text-brand' : 'text-amber-500'}`;
+        
+        const wrPath = document.getElementById('gauge-wr-path');
+        if (wrPath) {
+            wrPath.setAttribute('class', wr >= 50 ? 'text-brand' : 'text-amber-500');
+            wrPath.setAttribute('stroke-dasharray', `${Math.min(100, Math.max(0, wr))}, 100`);
+        }
 
-    const setGauge = (id, pct) => {
-        const path = document.getElementById(id);
-        if(!path) return;
-        const val = Math.min(100, Math.max(0, Math.abs(pct) * 5));
-        path.setAttribute('stroke-dasharray', `${val}, 100`);
-    };
-    
-    setGauge('gauge-ag-path', ag); 
-    setGauge('gauge-al-path', Math.abs(al));
-    if(document.getElementById('gauge-wr-path')) {
-        document.getElementById('gauge-wr-path').setAttribute('stroke-dasharray', `${Math.min(100, Math.max(0, wr))}, 100`);
+        const setGauge = (id, pct) => {
+            const path = document.getElementById(id);
+            if(!path) return;
+            const val = Math.min(100, Math.max(0, Math.abs(pct) * 5));
+            path.setAttribute('stroke-dasharray', `${val}, 100`);
+        };
+        
+        setGauge('gauge-ag-path', ag); 
+        setGauge('gauge-al-path', Math.abs(al));
+    } catch(e) {
+        console.error("Error drawing dials:", e);
     }
 }
 
@@ -945,7 +953,6 @@ function loadWlTab(id) {
         if(document.getElementById('w-stop-type')) document.getElementById('w-stop-type').value = wl.stopType || '100'; 
         if(document.getElementById('w-target-type')) document.getElementById('w-target-type').value = wl.targetType || '100'; 
         
-        // Force rendering immediately
         changeTrancheType(wl.trancheType || '100', false);
         changeStopType(wl.stopType || '100', false);
         changeTargetType(wl.targetType || '100', false);
@@ -1107,7 +1114,6 @@ function calcPlanner() {
         const wl = state.watchlist.find(w => w.id === state.activeWlId); 
         if(!wl) return;
         
-        // Wrap runEngine call in try/catch just in case it wasn't caught
         let engineResult = { buyingPower: 0, masterCapital: 0 };
         try {
             engineResult = runEngine(true);
@@ -1189,7 +1195,7 @@ function calcPlanner() {
         const netStopPerShare = wl.computedStop * (1 - FEES.sell); 
         const trueRiskPerShare = costPerShare - netStopPerShare;
         
-        const riskBudget = masterCapital * (wl.varPct / 100);
+        const riskBudget = masterCapital * ((wl.varPct || 1) / 100);
         
         let idealSharesVaR = trueRiskPerShare > 0 ? Math.floor(riskBudget / trueRiskPerShare) : 0; 
         let idealSharesCap = costPerShare > 0 ? Math.floor(capBudget / costPerShare) : 0;
@@ -1661,7 +1667,7 @@ function resetSimulatorToActuals() {
 }
 
 function runSimulatorCore() {
-    if(!document.getElementById('base-wr')) return; // Safety check
+    if(!document.getElementById('base-wr')) return;
 
     document.getElementById('base-wr').innerText = `${(globalActualStats.wr * 100).toFixed(1)}%`; 
     document.getElementById('base-gain').innerText = `+${(globalActualStats.avgGainPct * 100).toFixed(1)}%`; 
