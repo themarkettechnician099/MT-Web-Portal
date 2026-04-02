@@ -30,6 +30,16 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
+function healState() {
+    if (!state.strategies || state.strategies.length === 0) {
+        state.strategies = ['Breakout', 'Bounce Play', 'Swing'];
+    }
+    if (!state.activeHoldings) state.activeHoldings = [];
+    if (!state.watchlist) state.watchlist = [];
+    if (!state.journal) state.journal = [];
+    if (!state.ledger) state.ledger = [];
+}
+
 async function loadCloudProfile() {
     try {
         const docRef = doc(db, 'users', currentUser.uid);
@@ -40,6 +50,7 @@ async function loadCloudProfile() {
             
             if (data.tradingSandboxState) {
                 state = data.tradingSandboxState;
+                healState();
                 
                 // Trading Sandbox check: Does the ledger have entries?
                 if (state.ledger && state.ledger.length > 0) {
@@ -154,6 +165,7 @@ function undo() {
     if (undoStack.length === 0) return;
     isUndoAction = true; 
     state = JSON.parse(undoStack.pop());
+    healState();
     
     if (undoStack.length === 0) {
         document.getElementById('btn-undo').disabled = true;
@@ -251,7 +263,8 @@ function loadData(event) {
     const reader = new FileReader();
     reader.onload = function(e) { 
         try { 
-            state = JSON.parse(e.target.result); 
+            state = JSON.parse(e.target.result);
+            healState(); 
             exploreSandbox(); 
         } catch(err) { 
             alert("Invalid save file."); 
@@ -321,6 +334,7 @@ function executeNuclearReset() {
     state.journal = []; 
     state.watchlist = []; 
     state.activeWlId = null;
+    healState();
     
     hideResetModal();
     showStartFresh(); 
@@ -342,6 +356,7 @@ function confirmReset() {
     state.journal = []; 
     state.watchlist = []; 
     state.activeWlId = null;
+    healState();
     exploreSandbox();
 }
 
