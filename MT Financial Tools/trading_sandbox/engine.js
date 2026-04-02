@@ -33,8 +33,13 @@ onAuthStateChanged(auth, (user) => {
 function healState() {
     const enforceArray = (data, defaultData) => {
         if (!data) return defaultData;
-        if (Array.isArray(data)) return data;
-        if (typeof data === 'object') return Object.values(data); // Rescues corrupted Firebase objects
+        if (Array.isArray(data)) {
+            // Further sanitize: remove nulls/undefined from sparse arrays
+            return data.filter(item => item !== null && item !== undefined);
+        }
+        if (typeof data === 'object') {
+            return Object.values(data).filter(item => item !== null && item !== undefined);
+        }
         return defaultData;
     };
 
@@ -342,113 +347,133 @@ function confirmReset() {
 // 5. CORE MATHEMATICAL ENGINE
 // ==========================================
 function runEngine(skipGallery = false) {
-    let masterCapital = 0;
-    let realizedPnl = 0;
-    let totalDeployedCost = 0;
-    let totalNetValue = 0;
-    let unrealizedPnl = 0;
-    
-    let moneyIn = 0;
-    let moneyOut = 0;
+    try {
+        let masterCapital = 0;
+        let realizedPnl = 0;
+        let totalDeployedCost = 0;
+        let totalNetValue = 0;
+        let unrealizedPnl = 0;
+        
+        let moneyIn = 0;
+        let moneyOut = 0;
 
-    state.ledger.forEach(tx => { 
-        if (tx.type === 'DEPOSIT') {
-            masterCapital += tx.amount; 
-            moneyIn += tx.amount;
+        if (Array.isArray(state.ledger)) {
+            state.ledger.forEach(tx => { 
+                if (tx.type === 'DEPOSIT') {
+                    masterCapital += tx.amount; 
+                    moneyIn += tx.amount;
+                } else {
+                    masterCapital -= tx.amount; 
+                    moneyOut += tx.amount;
+                }
+            });
+        }
+        
+        let netPrincipal = moneyIn - moneyOut;
+        
+        if (Array.isArray(state.journal)) {
+            state.journal.forEach(t => { 
+                masterCapital += t.netPnl; 
+                realizedPnl += t.netPnl; 
+            });
+        }
+
+        if (Array.isArray(state.activeHoldings)) {
+            state.activeHoldings.forEach(pos => {
+                pos.totalCost = pos.shares * pos.avgCost * (1 + FEES.buy);
+                const rawMktPrice = pos.currentPrice || pos.avgCost;
+                const grossValue = pos.shares * rawMktPrice;
+                pos.netValue = grossValue > 0 ? grossValue * (1 - FEES.sell) : 0;
+                pos.unrealizedPnl = pos.netValue - pos.totalCost;
+                pos.pnlPct = pos.totalCost > 0 ? (pos.unrealizedPnl / pos.totalCost) * 100 : 0;
+                
+                totalDeployedCost += pos.totalCost; 
+                totalNetValue += pos.netValue;
+                unrealizedPnl += pos.unrealizedPnl;
+            });
+        }
+
+        let buyingPower = masterCapital - totalDeployedCost;
+        
+        let totalProfit = masterCapital - netPrincipal;
+        let allTimeGrowth = moneyIn > 0 ? (totalProfit / moneyIn) * 100 : 0;
+
+        if(document.getElementById('out-equity')) document.getElementById('out-equity').innerText = fmtPHP(masterCapital);
+        if(document.getElementById('dash-net-principal')) document.getElementById('dash-net-principal').innerText = fmtPHP(netPrincipal);
+        
+        const growthColor = allTimeGrowth >= 0 ? 'text-brand' : 'text-red-500';
+        const growthSign = allTimeGrowth >= 0 ? '+' : '';
+        if(document.getElementById('dash-all-time-growth')) {
+            document.getElementById('dash-all-time-growth').innerText = `${growthSign}${allTimeGrowth.toFixed(2)}%`;
+            document.getElementById('dash-all-time-growth').className = `font-bold ${growthColor}`;
+        }
+
+        if(document.getElementById('out-cash')) document.getElementById('out-cash').innerText = fmtPHP(buyingPower);
+        
+        const pnlColor = unrealizedPnl >= 0 ? 'text-brand' : 'text-red-500';
+        const rpnlColor = realizedPnl >= 0 ? 'text-brand' : 'text-red-500';
+        const unrPct = totalDeployedCost > 0 ? (unrealizedPnl / totalDeployedCost) * 100 : 0;
+        
+        if(document.getElementById('dash-unrealized-pnl')) {
+            document.getElementById('dash-unrealized-pnl').innerText = `${unrealizedPnl >= 0 ? '+' : ''}${fmtPHP(unrealizedPnl)}`;
+            document.getElementById('dash-unrealized-pnl').className = `text-2xl lg:text-3xl font-mono font-black leading-none truncate ${pnlColor}`;
+        }
+        if(document.getElementById('dash-unrealized-pct')) {
+            document.getElementById('dash-unrealized-pct').innerText = `${unrealizedPnl >= 0 ? '+' : ''}${unrPct.toFixed(2)}%`;
+            document.getElementById('dash-unrealized-pct').className = `text-xs font-mono font-bold mt-1 ${pnlColor}`;
+        }
+        if(document.getElementById('dash-realized-pnl')) {
+            document.getElementById('dash-realized-pnl').innerText = `${realizedPnl >= 0 ? '+' : ''}${fmtPHP(realizedPnl)}`;
+            document.getElementById('dash-realized-pnl').className = `text-2xl lg:text-3xl font-mono font-black leading-none truncate ${rpnlColor}`;
+        }
+
+        const currentPct = masterCapital > 0 ? (totalDeployedCost / masterCapital) * 100 : 0;
+        const barContainer = document.getElementById('hdr-bar-container'); 
+        if (barContainer) {
+            barContainer.innerHTML = '';
+            if (Array.isArray(state.activeHoldings)) {
+                state.activeHoldings.forEach((pos, idx) => {
+                    const posPct = masterCapital > 0 ? (pos.totalCost / masterCapital) * 100 : 0;
+                    if(posPct > 0) {
+                        const color = barColors[idx % barColors.length];
+                        barContainer.innerHTML += `<div style="width: ${posPct}%; background-color: ${color};" class="h-full transition-all border-r border-slate-900/20" title="${pos.ticker}"></div>`;
+                    }
+                });
+            }
+        }
+        
+        if(document.getElementById('hdr-dep-lbl')) document.getElementById('hdr-dep-lbl').innerText = `${currentPct.toFixed(1)}% DEPLOYED`;
+        if(document.getElementById('hdr-avail-lbl')) document.getElementById('hdr-avail-lbl').innerText = `${Math.max(0, 100 - currentPct).toFixed(1)}% AVAILABLE`;
+
+        const total = Array.isArray(state.journal) ? state.journal.length : 0;
+        if(total > 0) {
+            const wins = state.journal.filter(t => t.netPnl > 0);
+            const losses = state.journal.filter(t => t.netPnl <= 0);
+            
+            globalActualStats.wr = wins.length / total;
+            globalActualStats.avgGainPct = wins.length ? wins.reduce((s,t) => s + (t.netPnl/t.cost), 0) / wins.length : 0;
+            globalActualStats.avgLossPct = losses.length ? losses.reduce((s,t) => s + (t.netPnl/t.cost), 0) / losses.length : 0;
+            
+            globalActualStats.posSizePct = state.journal.reduce((s,t) => s + (t.posSizePct !== undefined ? t.posSizePct : 0), 0) / total;
         } else {
-            masterCapital -= tx.amount; 
-            moneyOut += tx.amount;
+            globalActualStats = { wr: 0, avgGainPct: 0, avgLossPct: 0, posSizePct: 0 };
         }
-    });
-    
-    let netPrincipal = moneyIn - moneyOut;
-    
-    state.journal.forEach(t => { 
-        masterCapital += t.netPnl; 
-        realizedPnl += t.netPnl; 
-    });
 
-    state.activeHoldings.forEach(pos => {
-        pos.totalCost = pos.shares * pos.avgCost * (1 + FEES.buy);
-        const rawMktPrice = pos.currentPrice || pos.avgCost;
-        const grossValue = pos.shares * rawMktPrice;
-        pos.netValue = grossValue > 0 ? grossValue * (1 - FEES.sell) : 0;
-        pos.unrealizedPnl = pos.netValue - pos.totalCost;
-        pos.pnlPct = pos.totalCost > 0 ? (pos.unrealizedPnl / pos.totalCost) * 100 : 0;
+        updateDials();
         
-        totalDeployedCost += pos.totalCost; 
-        totalNetValue += pos.netValue;
-        unrealizedPnl += pos.unrealizedPnl;
-    });
-
-    let buyingPower = masterCapital - totalDeployedCost;
-    
-    let totalProfit = masterCapital - netPrincipal;
-    let allTimeGrowth = moneyIn > 0 ? (totalProfit / moneyIn) * 100 : 0;
-
-    document.getElementById('out-equity').innerText = fmtPHP(masterCapital);
-    document.getElementById('dash-net-principal').innerText = fmtPHP(netPrincipal);
-    
-    const growthColor = allTimeGrowth >= 0 ? 'text-brand' : 'text-red-500';
-    const growthSign = allTimeGrowth >= 0 ? '+' : '';
-    document.getElementById('dash-all-time-growth').innerText = `${growthSign}${allTimeGrowth.toFixed(2)}%`;
-    document.getElementById('dash-all-time-growth').className = `font-bold ${growthColor}`;
-
-    document.getElementById('out-cash').innerText = fmtPHP(buyingPower);
-    
-    const pnlColor = unrealizedPnl >= 0 ? 'text-brand' : 'text-red-500';
-    const rpnlColor = realizedPnl >= 0 ? 'text-brand' : 'text-red-500';
-    const unrPct = totalDeployedCost > 0 ? (unrealizedPnl / totalDeployedCost) * 100 : 0;
-    
-    document.getElementById('dash-unrealized-pnl').innerText = `${unrealizedPnl >= 0 ? '+' : ''}${fmtPHP(unrealizedPnl)}`;
-    document.getElementById('dash-unrealized-pnl').className = `text-2xl lg:text-3xl font-mono font-black leading-none truncate ${pnlColor}`;
-    
-    document.getElementById('dash-unrealized-pct').innerText = `${unrealizedPnl >= 0 ? '+' : ''}${unrPct.toFixed(2)}%`;
-    document.getElementById('dash-unrealized-pct').className = `text-xs font-mono font-bold mt-1 ${pnlColor}`;
-    
-    document.getElementById('dash-realized-pnl').innerText = `${realizedPnl >= 0 ? '+' : ''}${fmtPHP(realizedPnl)}`;
-    document.getElementById('dash-realized-pnl').className = `text-2xl lg:text-3xl font-mono font-black leading-none truncate ${rpnlColor}`;
-
-    const currentPct = masterCapital > 0 ? (totalDeployedCost / masterCapital) * 100 : 0;
-    const barContainer = document.getElementById('hdr-bar-container'); 
-    barContainer.innerHTML = '';
-    
-    state.activeHoldings.forEach((pos, idx) => {
-        const posPct = masterCapital > 0 ? (pos.totalCost / masterCapital) * 100 : 0;
-        if(posPct > 0) {
-            const color = barColors[idx % barColors.length];
-            barContainer.innerHTML += `<div style="width: ${posPct}%; background-color: ${color};" class="h-full transition-all border-r border-slate-900/20" title="${pos.ticker}"></div>`;
+        if (!skipGallery) {
+            renderHoldingsGallery(masterCapital);
         }
-    });
-    
-    document.getElementById('hdr-dep-lbl').innerText = `${currentPct.toFixed(1)}% DEPLOYED`;
-    document.getElementById('hdr-avail-lbl').innerText = `${Math.max(0, 100 - currentPct).toFixed(1)}% AVAILABLE`;
-
-    const total = state.journal.length;
-    if(total > 0) {
-        const wins = state.journal.filter(t => t.netPnl > 0);
-        const losses = state.journal.filter(t => t.netPnl <= 0);
         
-        globalActualStats.wr = wins.length / total;
-        globalActualStats.avgGainPct = wins.length ? wins.reduce((s,t) => s + (t.netPnl/t.cost), 0) / wins.length : 0;
-        globalActualStats.avgLossPct = losses.length ? losses.reduce((s,t) => s + (t.netPnl/t.cost), 0) / losses.length : 0;
-        
-        globalActualStats.posSizePct = state.journal.reduce((s,t) => s + (t.posSizePct !== undefined ? t.posSizePct : 0), 0) / total;
-    } else {
-        globalActualStats = { wr: 0, avgGainPct: 0, avgLossPct: 0, posSizePct: 0 };
-    }
+        if(document.getElementById('view-dashboard') && !document.getElementById('view-dashboard').classList.contains('hidden')) {
+            renderDashboardCharts();
+        }
 
-    updateDials();
-    
-    if (!skipGallery) {
-        renderHoldingsGallery(masterCapital);
+        return { masterCapital, buyingPower };
+    } catch (e) {
+        console.error("Engine crashed, fallback used:", e);
+        return { masterCapital: 0, buyingPower: 0 };
     }
-    
-    if(!document.getElementById('view-dashboard').classList.contains('hidden')) {
-        renderDashboardCharts();
-    }
-
-    return { masterCapital, buyingPower };
 }
 
 // ==========================================
@@ -464,12 +489,12 @@ function updateDials() {
     const ag = globalActualStats.avgGainPct * 100;
     const al = globalActualStats.avgLossPct * 100;
 
-    document.getElementById('gauge-wr-text').innerText = `${wr.toFixed(1)}%`;
-    document.getElementById('gauge-ag-text').innerText = `+${ag.toFixed(1)}%`;
-    document.getElementById('gauge-al-text').innerText = `${al.toFixed(1)}%`;
+    if(document.getElementById('gauge-wr-text')) document.getElementById('gauge-wr-text').innerText = `${wr.toFixed(1)}%`;
+    if(document.getElementById('gauge-ag-text')) document.getElementById('gauge-ag-text').innerText = `+${ag.toFixed(1)}%`;
+    if(document.getElementById('gauge-al-text')) document.getElementById('gauge-al-text').innerText = `${al.toFixed(1)}%`;
     
-    document.getElementById('gauge-wr-text').className = `text-2xl font-mono font-black ${wr >= 50 ? 'text-brand' : 'text-amber-500'}`;
-    document.getElementById('gauge-wr-path').className = wr >= 50 ? 'text-brand' : 'text-amber-500';
+    if(document.getElementById('gauge-wr-text')) document.getElementById('gauge-wr-text').className = `text-2xl font-mono font-black ${wr >= 50 ? 'text-brand' : 'text-amber-500'}`;
+    if(document.getElementById('gauge-wr-path')) document.getElementById('gauge-wr-path').className = wr >= 50 ? 'text-brand' : 'text-amber-500';
 
     const setGauge = (id, pct) => {
         const path = document.getElementById(id);
@@ -486,6 +511,7 @@ function updateDials() {
 }
 
 function calculateDistributionData() {
+    if (!Array.isArray(state.journal)) return null;
     const returns = state.journal.map(t => t.netPnl / t.cost);
     if(returns.length === 0) return null;
 
@@ -524,11 +550,13 @@ function calculateDistributionData() {
 
 function calculateStrategyStatsData() {
     const stats = {};
-    state.journal.forEach(t => {
-        if(!stats[t.strat]) stats[t.strat] = { count: 0, wins: 0 };
-        stats[t.strat].count++;
-        if(t.netPnl > 0) stats[t.strat].wins++;
-    });
+    if (Array.isArray(state.journal)) {
+        state.journal.forEach(t => {
+            if(!stats[t.strat]) stats[t.strat] = { count: 0, wins: 0 };
+            stats[t.strat].count++;
+            if(t.netPnl > 0) stats[t.strat].wins++;
+        });
+    }
     
     const labels = []; const barData = []; const lineData = []; const colors = [];
     Object.keys(stats).forEach(s => {
@@ -548,7 +576,7 @@ function renderDashboardCharts() {
     const distEmpty = document.getElementById('dist-empty');
     const stratEmpty = document.getElementById('strat-empty');
 
-    if(state.journal.length === 0) {
+    if(!Array.isArray(state.journal) || state.journal.length === 0) {
         if(distEmpty) distEmpty.classList.remove('hidden');
         if(stratEmpty) stratEmpty.classList.remove('hidden');
         if(distChart) distChart.destroy();
@@ -561,7 +589,7 @@ function renderDashboardCharts() {
         if(dData) {
             const ctxD = document.getElementById('distChart');
             if(ctxD && distChart) distChart.destroy();
-            distChart = new Chart(ctxD.getContext('2d'), {
+            if(ctxD) distChart = new Chart(ctxD.getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: dData.labels,
@@ -578,31 +606,33 @@ function renderDashboardCharts() {
         if(sData.labels.length > 0) {
             const ctxS = document.getElementById('stratChart');
             
-            const minWidthPerBar = 50; 
-            const chartWrapper = ctxS.parentElement;
-            chartWrapper.style.width = Math.max(100, sData.labels.length * minWidthPerBar) + 'px';
+            if(ctxS) {
+                const minWidthPerBar = 50; 
+                const chartWrapper = ctxS.parentElement;
+                chartWrapper.style.width = Math.max(100, sData.labels.length * minWidthPerBar) + 'px';
 
-            if(ctxS && stratChart) stratChart.destroy();
-            stratChart = new Chart(ctxS.getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: sData.labels,
-                    datasets: [
-                        { type: 'line', label: 'Executions', data: sData.barData, borderColor: '#f59e0b', borderWidth: 2, pointBackgroundColor: '#f59e0b', yAxisID: 'y1' },
-                        { type: 'bar', label: 'Win %', data: sData.lineData, backgroundColor: sData.colors, borderRadius: 4, yAxisID: 'y' }
-                    ]
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        x: { grid: { display: false }, ticks: { color: textColor } }, 
-                        y: { position: 'left', grid: { color: gridColor }, min: 0, max: 100, ticks: { color: textColor, callback: v => v+'%' } }, 
-                        y1: { position: 'right', grid: { display: false }, ticks: { color: '#f59e0b', stepSize: 1 } } 
-                    } 
-                }
-            });
+                if(stratChart) stratChart.destroy();
+                stratChart = new Chart(ctxS.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: sData.labels,
+                        datasets: [
+                            { type: 'line', label: 'Executions', data: sData.barData, borderColor: '#f59e0b', borderWidth: 2, pointBackgroundColor: '#f59e0b', yAxisID: 'y1' },
+                            { type: 'bar', label: 'Win %', data: sData.lineData, backgroundColor: sData.colors, borderRadius: 4, yAxisID: 'y' }
+                        ]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { display: false } }, 
+                        scales: { 
+                            x: { grid: { display: false }, ticks: { color: textColor } }, 
+                            y: { position: 'left', grid: { color: gridColor }, min: 0, max: 100, ticks: { color: textColor, callback: v => v+'%' } }, 
+                            y1: { position: 'right', grid: { display: false }, ticks: { color: '#f59e0b', stepSize: 1 } } 
+                        } 
+                    }
+                });
+            }
         }
     }
 
@@ -610,14 +640,16 @@ function renderDashboardCharts() {
     let sectorMap = {};
     let strategyMap = {};
     
-    state.activeHoldings.forEach(pos => {
-        totalActiveValue += pos.netValue;
-        if(!sectorMap[pos.sector]) sectorMap[pos.sector] = 0;
-        sectorMap[pos.sector] += pos.netValue;
-        
-        if(!strategyMap[pos.strategy]) strategyMap[pos.strategy] = 0;
-        strategyMap[pos.strategy] += pos.netValue;
-    });
+    if (Array.isArray(state.activeHoldings)) {
+        state.activeHoldings.forEach(pos => {
+            totalActiveValue += pos.netValue;
+            if(!sectorMap[pos.sector]) sectorMap[pos.sector] = 0;
+            sectorMap[pos.sector] += pos.netValue;
+            
+            if(!strategyMap[pos.strategy]) strategyMap[pos.strategy] = 0;
+            strategyMap[pos.strategy] += pos.netValue;
+        });
+    }
 
     const secLabels = []; const secData = []; const secColors = [];
     if(document.getElementById('sector-legend')) {
@@ -687,7 +719,7 @@ function renderHoldingsGallery(masterCapital) {
     
     container.innerHTML = '';
     
-    if (state.activeHoldings.length === 0) { 
+    if (!Array.isArray(state.activeHoldings) || state.activeHoldings.length === 0) { 
         container.innerHTML = `
             <div class="col-span-full glass-panel p-12 rounded-2xl flex flex-col items-center justify-center text-center">
                 <svg class="w-16 h-16 text-slate-300 dark:text-slate-700 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
@@ -755,6 +787,7 @@ function handleGalleryUpload(e, id) {
     if(e.target.files.length > 0) {
         const reader = new FileReader();
         reader.onload = (ev) => {
+            if (!Array.isArray(state.activeHoldings)) return;
             const pos = state.activeHoldings.find(p => p.id === id);
             if (pos) {
                 pos.image = ev.target.result;
@@ -769,6 +802,7 @@ function handleGalleryUpload(e, id) {
 function handleMktPriceInput(id, newPrice) {
     const price = parseFloat(newPrice); 
     if(isNaN(price)) return;
+    if (!Array.isArray(state.activeHoldings)) return;
     
     const idx = state.activeHoldings.findIndex(p => p.id === id);
     if(idx > -1) { 
@@ -813,7 +847,7 @@ const getBoardLot = (price) => {
 
 const createEmptyWl = (id) => ({ 
     id, ticker: '', sector: 'Others', varPct: 1.0, maxPosPct: 25, 
-    setup: state.strategies[0], 
+    setup: (state.strategies && state.strategies.length > 0) ? state.strategies[0] : 'Breakout', 
     trancheType: '100', entries: [0, 0, 0], computedAEP: 0,
     stopType: '100', stopEntries: [0, 0], computedStop: 0,
     targetType: '100', targetEntries: [0, 0], computedTarget: 0,
@@ -821,29 +855,39 @@ const createEmptyWl = (id) => ({
 });
 
 function populateStrategyDropdowns() {
-    const select = document.getElementById('w-setup'); 
-    if(!select) return;
-    const currentVal = select.value; 
-    select.innerHTML = '';
-    state.strategies.forEach(s => { 
-        select.innerHTML += `<option value="${s}">${s}</option>`; 
-    });
-    if (state.strategies.includes(currentVal)) select.value = currentVal; 
-    else if (state.strategies.length > 0) select.value = state.strategies[0];
+    try {
+        const select = document.getElementById('w-setup'); 
+        if(!select) return;
+        const currentVal = select.value; 
+        select.innerHTML = '';
+        if (Array.isArray(state.strategies)) {
+            state.strategies.forEach(s => { 
+                select.innerHTML += `<option value="${s}">${s}</option>`; 
+            });
+        }
+        if (Array.isArray(state.strategies) && state.strategies.includes(currentVal)) select.value = currentVal; 
+        else if (Array.isArray(state.strategies) && state.strategies.length > 0) select.value = state.strategies[0];
+    } catch(e) {
+        console.error("Error populating strategy dropdowns:", e);
+    }
 }
 
 function initPlanner() {
-    populateStrategyDropdowns();
-    
-    if (!state.watchlist || state.watchlist.length === 0) { 
-        state.watchlist = [createEmptyWl(Date.now())]; 
-        state.activeWlId = state.watchlist[0].id; 
-    } else if (!state.watchlist.find(w => w.id === state.activeWlId)) {
-        state.activeWlId = state.watchlist[0].id;
+    try {
+        populateStrategyDropdowns();
+        
+        if (!Array.isArray(state.watchlist) || state.watchlist.length === 0) { 
+            state.watchlist = [createEmptyWl(Date.now())]; 
+            state.activeWlId = state.watchlist[0].id; 
+        } else if (!state.watchlist.find(w => w.id === state.activeWlId)) {
+            state.activeWlId = state.watchlist[0].id;
+        }
+        
+        renderWlTabs(); 
+        loadWlTab(state.activeWlId);
+    } catch(e) {
+        console.error("Error initializing planner:", e);
     }
-    
-    renderWlTabs(); 
-    loadWlTab(state.activeWlId);
 }
 
 function renderWlTabs() {
@@ -851,6 +895,8 @@ function renderWlTabs() {
     if(!container) return;
     container.innerHTML = '';
     
+    if (!Array.isArray(state.watchlist)) return;
+
     state.watchlist.forEach((wl, i) => {
         const btn = document.createElement('button');
         btn.className = `wl-tab px-4 py-2 rounded-t-lg font-mono text-sm font-bold border-2 border-b-0 transition-colors z-10 -mb-[2px] ${wl.id === state.activeWlId ? 'active' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`;
@@ -874,52 +920,59 @@ function renderWlTabs() {
 }
 
 function loadWlTab(id) {
-    state.activeWlId = id; 
-    
-    let wl = state.watchlist.find(w => w.id === id);
-    if (!wl) {
-        if (state.watchlist.length > 0) {
-            wl = state.watchlist[0];
-            state.activeWlId = wl.id;
-        } else {
-            return; 
+    try {
+        state.activeWlId = id; 
+        
+        if (!Array.isArray(state.watchlist)) return;
+        
+        let wl = state.watchlist.find(w => w.id === id);
+        if (!wl) {
+            if (state.watchlist.length > 0) {
+                wl = state.watchlist[0];
+                state.activeWlId = wl.id;
+            } else {
+                return; 
+            }
         }
-    }
-    
-    if(document.getElementById('w-ticker')) document.getElementById('w-ticker').value = wl.ticker; 
-    if(document.getElementById('w-sector')) document.getElementById('w-sector').value = wl.sector || 'Others';
-    if(document.getElementById('w-var')) document.getElementById('w-var').value = wl.varPct; 
-    if(document.getElementById('w-maxpos')) document.getElementById('w-maxpos').value = wl.maxPosPct || 25; 
-    if(document.getElementById('w-setup')) document.getElementById('w-setup').value = wl.setup || state.strategies[0]; 
-    
-    if(document.getElementById('w-tranche')) document.getElementById('w-tranche').value = wl.trancheType || '100'; 
-    if(document.getElementById('w-stop-type')) document.getElementById('w-stop-type').value = wl.stopType || '100'; 
-    if(document.getElementById('w-target-type')) document.getElementById('w-target-type').value = wl.targetType || '100'; 
-    
-    // Explicitly draw the boxes when the tab loads
-    changeTrancheType(wl.trancheType, false);
-    changeStopType(wl.stopType, false);
-    changeTargetType(wl.targetType, false);
-    
-    const prev = document.getElementById('img-preview');
-    if(prev) {
-        if(wl.image) { 
-            prev.src = wl.image; 
-            prev.classList.remove('hidden'); 
-            document.getElementById('clear-img').classList.remove('hidden'); 
-            document.getElementById('img-placeholder').classList.add('hidden'); 
-        } else { 
-            prev.classList.add('hidden'); 
-            document.getElementById('clear-img').classList.add('hidden'); 
-            document.getElementById('img-placeholder').classList.remove('hidden'); 
+        
+        if(document.getElementById('w-ticker')) document.getElementById('w-ticker').value = wl.ticker || ''; 
+        if(document.getElementById('w-sector')) document.getElementById('w-sector').value = wl.sector || 'Others';
+        if(document.getElementById('w-var')) document.getElementById('w-var').value = wl.varPct || 1; 
+        if(document.getElementById('w-maxpos')) document.getElementById('w-maxpos').value = wl.maxPosPct || 25; 
+        if(document.getElementById('w-setup')) document.getElementById('w-setup').value = wl.setup || (state.strategies && state.strategies.length > 0 ? state.strategies[0] : 'Breakout'); 
+        
+        if(document.getElementById('w-tranche')) document.getElementById('w-tranche').value = wl.trancheType || '100'; 
+        if(document.getElementById('w-stop-type')) document.getElementById('w-stop-type').value = wl.stopType || '100'; 
+        if(document.getElementById('w-target-type')) document.getElementById('w-target-type').value = wl.targetType || '100'; 
+        
+        // Force rendering immediately
+        changeTrancheType(wl.trancheType || '100', false);
+        changeStopType(wl.stopType || '100', false);
+        changeTargetType(wl.targetType || '100', false);
+        
+        const prev = document.getElementById('img-preview');
+        if(prev) {
+            if(wl.image) { 
+                prev.src = wl.image; 
+                prev.classList.remove('hidden'); 
+                if(document.getElementById('clear-img')) document.getElementById('clear-img').classList.remove('hidden'); 
+                if(document.getElementById('img-placeholder')) document.getElementById('img-placeholder').classList.add('hidden'); 
+            } else { 
+                prev.classList.add('hidden'); 
+                if(document.getElementById('clear-img')) document.getElementById('clear-img').classList.add('hidden'); 
+                if(document.getElementById('img-placeholder')) document.getElementById('img-placeholder').classList.remove('hidden'); 
+            }
         }
+        
+        renderWlTabs(); 
+        calcPlanner();
+    } catch(e) {
+        console.error("Error loading WL tab:", e);
     }
-    
-    renderWlTabs(); 
-    calcPlanner();
 }
 
 function updateWl(key, val) { 
+    if (!Array.isArray(state.watchlist)) return;
     const wl = state.watchlist.find(w => w.id === state.activeWlId);
     if (!wl) return;
     wl[key] = (key === 'ticker' || key === 'setup' || key === 'sector') ? val : (parseFloat(val) || 0); 
@@ -928,6 +981,7 @@ function updateWl(key, val) {
 }
 
 function changeTrancheType(type, clear = true) {
+    if (!Array.isArray(state.watchlist)) return;
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
     if (!wl) return;
     wl.trancheType = type; 
@@ -945,12 +999,13 @@ function changeTrancheType(type, clear = true) {
     
     cont.className = `grid gap-4 grid-cols-${cfgs.length}`;
     cfgs.forEach(c => { 
+        let valToRender = (wl.entries && wl.entries[c.i]) ? wl.entries[c.i] : '';
         cont.innerHTML += `
             <div>
                 <label class="block text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">${c.l}</label>
                 <div class="relative">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">₱</span>
-                    <input type="number" step="any" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-2 pl-7 font-mono text-base text-slate-900 dark:text-white focus:ring-2 focus:ring-brand outline-none" value="${wl.entries[c.i] || ''}" oninput="updateTranche(${c.i}, this.value)">
+                    <input type="number" step="any" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded p-2 pl-7 font-mono text-base text-slate-900 dark:text-white focus:ring-2 focus:ring-brand outline-none" value="${valToRender}" oninput="updateTranche(${c.i}, this.value)">
                 </div>
             </div>`; 
     });
@@ -958,14 +1013,16 @@ function changeTrancheType(type, clear = true) {
 }
 
 function updateTranche(idx, val) { 
+    if (!Array.isArray(state.watchlist)) return;
     const wl = state.watchlist.find(w => w.id === state.activeWlId);
     if (!wl) return;
-    // Aggressive sanitization: convert to number or default to 0
-    wl.entries[idx] = parseFloat(val) || 0; 
+    if (!wl.entries) wl.entries = [0,0,0];
+    wl.entries[idx] = parseFloat(val.toString().replace(/,/g, '')) || 0; 
     calcPlanner(); 
 }
 
 function changeStopType(type, clear = true) {
+    if (!Array.isArray(state.watchlist)) return;
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
     if (!wl) return;
     wl.stopType = type; 
@@ -982,12 +1039,13 @@ function changeStopType(type, clear = true) {
     
     cont.className = `grid gap-3 grid-cols-${cfgs.length}`;
     cfgs.forEach(c => { 
+        let valToRender = (wl.stopEntries && wl.stopEntries[c.i]) ? wl.stopEntries[c.i] : '';
         cont.innerHTML += `
             <div>
                 <label class="block text-[9px] text-red-500/70 uppercase font-bold tracking-widest mb-1">${c.l}</label>
                 <div class="relative">
                     <span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xs">₱</span>
-                    <input type="number" step="any" class="w-full bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 rounded p-1.5 pl-6 font-mono text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-red-500 outline-none" value="${wl.stopEntries[c.i] || ''}" oninput="updateStop(${c.i}, this.value)">
+                    <input type="number" step="any" class="w-full bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 rounded p-1.5 pl-6 font-mono text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-red-500 outline-none" value="${valToRender}" oninput="updateStop(${c.i}, this.value)">
                 </div>
             </div>`; 
     });
@@ -995,13 +1053,16 @@ function changeStopType(type, clear = true) {
 }
 
 function updateStop(idx, val) { 
+    if (!Array.isArray(state.watchlist)) return;
     const wl = state.watchlist.find(w => w.id === state.activeWlId);
     if (!wl) return;
-    wl.stopEntries[idx] = parseFloat(val) || 0; 
+    if (!wl.stopEntries) wl.stopEntries = [0,0];
+    wl.stopEntries[idx] = parseFloat(val.toString().replace(/,/g, '')) || 0; 
     calcPlanner(); 
 }
 
 function changeTargetType(type, clear = true) {
+    if (!Array.isArray(state.watchlist)) return;
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
     if (!wl) return;
     wl.targetType = type; 
@@ -1018,12 +1079,13 @@ function changeTargetType(type, clear = true) {
     
     cont.className = `grid gap-3 grid-cols-${cfgs.length}`;
     cfgs.forEach(c => { 
+        let valToRender = (wl.targetEntries && wl.targetEntries[c.i]) ? wl.targetEntries[c.i] : '';
         cont.innerHTML += `
             <div>
                 <label class="block text-[9px] text-green-600/70 uppercase font-bold tracking-widest mb-1">${c.l}</label>
                 <div class="relative">
                     <span class="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold text-xs">₱</span>
-                    <input type="number" step="any" class="w-full bg-white dark:bg-slate-900 border border-green-200 dark:border-green-900/50 rounded p-1.5 pl-6 font-mono text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-brand outline-none" value="${wl.targetEntries[c.i] || ''}" oninput="updateTarget(${c.i}, this.value)">
+                    <input type="number" step="any" class="w-full bg-white dark:bg-slate-900 border border-green-200 dark:border-green-900/50 rounded p-1.5 pl-6 font-mono text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-brand outline-none" value="${valToRender}" oninput="updateTarget(${c.i}, this.value)">
                 </div>
             </div>`; 
     });
@@ -1031,98 +1093,115 @@ function changeTargetType(type, clear = true) {
 }
 
 function updateTarget(idx, val) { 
+    if (!Array.isArray(state.watchlist)) return;
     const wl = state.watchlist.find(w => w.id === state.activeWlId);
     if (!wl) return;
-    wl.targetEntries[idx] = parseFloat(val) || 0; 
+    if (!wl.targetEntries) wl.targetEntries = [0,0];
+    wl.targetEntries[idx] = parseFloat(val.toString().replace(/,/g, '')) || 0; 
     calcPlanner(); 
 }
 
 function calcPlanner() {
-    const wl = state.watchlist.find(w => w.id === state.activeWlId); 
-    if(!wl) return;
-    const { buyingPower, masterCapital } = runEngine(false);
-
-    const capBudget = masterCapital * ((wl.maxPosPct || 25) / 100); 
-    if(document.getElementById('w-maxpos-peso')) document.getElementById('w-maxpos-peso').innerText = `Limit: ${fmtPHP(capBudget)}`;
-
-    let aep = 0, valid = true; 
-    const [e1, e2, e3] = wl.entries || [0, 0, 0];
-    
-    if (wl.trancheType === '100') { 
-        if (!e1) valid = false; else aep = e1; 
-    } else if (wl.trancheType === '50-50') { 
-        if (!e1 || !e2) valid = false; else aep = (e1*0.5) + (e2*0.5); 
-    } else if (wl.trancheType === '50-30-20') { 
-        if (!e1 || !e2 || !e3) valid = false; else aep = (e1*0.5) + (e2*0.3) + (e3*0.2); 
-    }
-    wl.computedAEP = valid ? aep : 0; 
-    wl.isTrancheValid = valid;
-    
-    if(document.getElementById('w-aep')) document.getElementById('w-aep').innerText = wl.computedAEP ? `₱${wl.computedAEP.toFixed(4)}` : "₱0.00"; 
-    const bl = getBoardLot(wl.computedAEP || 0); 
-    if(document.getElementById('w-boardlot')) document.getElementById('w-boardlot').innerText = bl.toLocaleString();
-
-    let computedStop = 0;
-    const [s1, s2] = wl.stopEntries || [0, 0];
-    
-    if (wl.stopType === '100' && s1) computedStop = s1;
-    else if (wl.stopType === '50-50' && s1 && s2) computedStop = (s1*0.5) + (s2*0.5);
-    wl.computedStop = computedStop;
-    
-    if(document.getElementById('w-blended-stop')) document.getElementById('w-blended-stop').innerText = wl.computedStop ? `₱${wl.computedStop.toFixed(4)}` : "₱0.00";
-
-    let computedTarget = 0;
-    const [t1, t2] = wl.targetEntries || [0, 0];
-    
-    if (wl.targetType === '100' && t1) computedTarget = t1;
-    else if (wl.targetType === '50-50' && t1 && t2) computedTarget = (t1*0.5) + (t2*0.5);
-    wl.computedTarget = computedTarget;
-    
-    if(document.getElementById('w-blended-target')) document.getElementById('w-blended-target').innerText = wl.computedTarget ? `₱${wl.computedTarget.toFixed(4)}` : "₱0.00";
-
-    if (wl.computedAEP > 0) {
-        const costPerShare = wl.computedAEP * (1 + FEES.buy);
+    try {
+        if (!Array.isArray(state.watchlist)) return;
+        const wl = state.watchlist.find(w => w.id === state.activeWlId); 
+        if(!wl) return;
         
-        if (wl.computedStop > 0) { 
-            const stopNetPerShare = wl.computedStop * (1 - FEES.sell); 
-            const stopPct = ((stopNetPerShare - costPerShare) / costPerShare) * 100; 
-            if(document.getElementById('w-stop-pct')) document.getElementById('w-stop-pct').innerText = `${stopPct.toFixed(2)}%`; 
+        // Wrap runEngine call in try/catch just in case it wasn't caught
+        let engineResult = { buyingPower: 0, masterCapital: 0 };
+        try {
+            engineResult = runEngine(true);
+        } catch(e) {
+            console.error("Engine failed in calcPlanner", e);
+        }
+        
+        const buyingPower = engineResult.buyingPower || 0;
+        const masterCapital = engineResult.masterCapital || 0;
+
+        const capBudget = masterCapital * ((wl.maxPosPct || 25) / 100); 
+        if(document.getElementById('w-maxpos-peso')) document.getElementById('w-maxpos-peso').innerText = `Limit: ${fmtPHP(capBudget)}`;
+
+        let aep = 0, valid = true; 
+        const [e1, e2, e3] = wl.entries || [0, 0, 0];
+        
+        if (wl.trancheType === '100') { 
+            if (!e1) valid = false; else aep = e1; 
+        } else if (wl.trancheType === '50-50') { 
+            if (!e1 || !e2) valid = false; else aep = (e1*0.5) + (e2*0.5); 
+        } else if (wl.trancheType === '50-30-20') { 
+            if (!e1 || !e2 || !e3) valid = false; else aep = (e1*0.5) + (e2*0.3) + (e3*0.2); 
+        }
+        wl.computedAEP = valid ? aep : 0; 
+        wl.isTrancheValid = valid;
+        
+        if(document.getElementById('w-aep')) document.getElementById('w-aep').innerText = wl.computedAEP ? `₱${wl.computedAEP.toFixed(4)}` : "₱0.00"; 
+        const bl = getBoardLot(wl.computedAEP || 0); 
+        if(document.getElementById('w-boardlot')) document.getElementById('w-boardlot').innerText = bl.toLocaleString();
+
+        let computedStop = 0;
+        const [s1, s2] = wl.stopEntries || [0, 0];
+        
+        if (wl.stopType === '100' && s1) computedStop = s1;
+        else if (wl.stopType === '50-50' && s1 && s2) computedStop = (s1*0.5) + (s2*0.5);
+        wl.computedStop = computedStop;
+        
+        if(document.getElementById('w-blended-stop')) document.getElementById('w-blended-stop').innerText = wl.computedStop ? `₱${wl.computedStop.toFixed(4)}` : "₱0.00";
+
+        let computedTarget = 0;
+        const [t1, t2] = wl.targetEntries || [0, 0];
+        
+        if (wl.targetType === '100' && t1) computedTarget = t1;
+        else if (wl.targetType === '50-50' && t1 && t2) computedTarget = (t1*0.5) + (t2*0.5);
+        wl.computedTarget = computedTarget;
+        
+        if(document.getElementById('w-blended-target')) document.getElementById('w-blended-target').innerText = wl.computedTarget ? `₱${wl.computedTarget.toFixed(4)}` : "₱0.00";
+
+        if (wl.computedAEP > 0) {
+            const costPerShare = wl.computedAEP * (1 + FEES.buy);
+            
+            if (wl.computedStop > 0) { 
+                const stopNetPerShare = wl.computedStop * (1 - FEES.sell); 
+                const stopPct = ((stopNetPerShare - costPerShare) / costPerShare) * 100; 
+                if(document.getElementById('w-stop-pct')) document.getElementById('w-stop-pct').innerText = `${stopPct.toFixed(2)}%`; 
+            } else { 
+                if(document.getElementById('w-stop-pct')) document.getElementById('w-stop-pct').innerText = ``; 
+            }
+            
+            if (wl.computedTarget > 0) { 
+                const targetNetPerShare = wl.computedTarget * (1 - FEES.sell); 
+                const targetPct = ((targetNetPerShare - costPerShare) / costPerShare) * 100; 
+                if(document.getElementById('w-target-pct')) document.getElementById('w-target-pct').innerText = `+${targetPct.toFixed(2)}%`; 
+            } else { 
+                if(document.getElementById('w-target-pct')) document.getElementById('w-target-pct').innerText = ``; 
+            }
         } else { 
             if(document.getElementById('w-stop-pct')) document.getElementById('w-stop-pct').innerText = ``; 
-        }
-        
-        if (wl.computedTarget > 0) { 
-            const targetNetPerShare = wl.computedTarget * (1 - FEES.sell); 
-            const targetPct = ((targetNetPerShare - costPerShare) / costPerShare) * 100; 
-            if(document.getElementById('w-target-pct')) document.getElementById('w-target-pct').innerText = `+${targetPct.toFixed(2)}%`; 
-        } else { 
             if(document.getElementById('w-target-pct')) document.getElementById('w-target-pct').innerText = ``; 
         }
-    } else { 
-        if(document.getElementById('w-stop-pct')) document.getElementById('w-stop-pct').innerText = ``; 
-        if(document.getElementById('w-target-pct')) document.getElementById('w-target-pct').innerText = ``; 
-    }
 
-    if (!wl.computedAEP || !wl.computedStop || !wl.ticker || wl.computedStop >= wl.computedAEP || !wl.isTrancheValid) { 
-        if(document.getElementById('o-shares')) document.getElementById('o-shares').value = ''; 
-        calcTicketFromShares(); 
-        return; 
-    }
+        if (!wl.computedAEP || !wl.computedStop || !wl.ticker || wl.computedStop >= wl.computedAEP || !wl.isTrancheValid) { 
+            if(document.getElementById('o-shares')) document.getElementById('o-shares').value = ''; 
+            calcTicketFromShares(); 
+            return; 
+        }
 
-    const costPerShare = wl.computedAEP * (1 + FEES.buy); 
-    const netStopPerShare = wl.computedStop * (1 - FEES.sell); 
-    const trueRiskPerShare = costPerShare - netStopPerShare;
-    
-    const riskBudget = masterCapital * (wl.varPct / 100);
-    
-    let idealSharesVaR = trueRiskPerShare > 0 ? Math.floor(riskBudget / trueRiskPerShare) : 0; 
-    let idealSharesCap = costPerShare > 0 ? Math.floor(capBudget / costPerShare) : 0;
-    let rawShares = Math.min(idealSharesVaR, idealSharesCap, Math.floor(Math.max(0, buyingPower) / costPerShare));
-    
-    let finalShares = Math.floor(rawShares / bl) * bl; 
-    if(document.getElementById('o-shares')) document.getElementById('o-shares').value = finalShares.toLocaleString();
-    
-    calcTicketFromShares();
+        const costPerShare = wl.computedAEP * (1 + FEES.buy); 
+        const netStopPerShare = wl.computedStop * (1 - FEES.sell); 
+        const trueRiskPerShare = costPerShare - netStopPerShare;
+        
+        const riskBudget = masterCapital * (wl.varPct / 100);
+        
+        let idealSharesVaR = trueRiskPerShare > 0 ? Math.floor(riskBudget / trueRiskPerShare) : 0; 
+        let idealSharesCap = costPerShare > 0 ? Math.floor(capBudget / costPerShare) : 0;
+        let rawShares = Math.min(idealSharesVaR, idealSharesCap, Math.floor(Math.max(0, buyingPower) / costPerShare));
+        
+        let finalShares = Math.floor(rawShares / bl) * bl; 
+        if(document.getElementById('o-shares')) document.getElementById('o-shares').value = finalShares.toLocaleString();
+        
+        calcTicketFromShares();
+    } catch(e) {
+        console.error("Error calculating planner:", e);
+    }
 }
 
 function userEditedShares(el) { 
@@ -1132,153 +1211,172 @@ function userEditedShares(el) {
 }
 
 function calcTicketFromShares() {
-    const wl = state.watchlist.find(w => w.id === state.activeWlId); 
-    if(!wl) return;
-    const sharesStr = document.getElementById('o-shares') ? document.getElementById('o-shares').value : '0'; 
-    const sharesInput = parseInt(sharesStr.replace(/,/g, '')) || 0; 
-    wl.shares = sharesInput;
-    
-    const { buyingPower, masterCapital } = runEngine(true); 
-    const btnExec = document.getElementById('btn-execute'); 
-    const warnBox = document.getElementById('exec-warning'); 
-    const blWarning = document.getElementById('boardlot-warning'); 
-    const actualPosPctEl = document.getElementById('w-actual-pos-pct');
-    
-    if(!btnExec || !warnBox || !blWarning || !actualPosPctEl) return;
-
-    const costPerShareCheck = wl.computedAEP ? wl.computedAEP * (1 + FEES.buy) : 0;
-    const netStopPerShareCheck = wl.computedStop ? wl.computedStop * (1 - FEES.sell) : 0;
-    const trueRiskPerShareCheck = costPerShareCheck - netStopPerShareCheck;
-    const riskBudgetCheck = masterCapital * (wl.varPct / 100);
-    const capBudgetCheck = masterCapital * ((wl.maxPosPct || 25) / 100);
-    const idealSharesVaR = trueRiskPerShareCheck > 0 ? Math.floor(riskBudgetCheck / trueRiskPerShareCheck) : 0; 
-    const idealSharesCap = costPerShareCheck > 0 ? Math.floor(capBudgetCheck / costPerShareCheck) : 0;
-
-    let expectedDD = 0;
-    const lossImpactPct = masterCapital > 0 ? ((wl.shares * trueRiskPerShareCheck) / masterCapital) * 100 : 0;
-    const lossProb = 1 - (globalActualStats.wr > 0 ? globalActualStats.wr : 0.4); 
-    if(lossProb > 0 && lossProb < 1) { 
-        const expectedStreak = Math.log(100) / Math.log(1/lossProb); 
-        expectedDD = 1 - Math.pow(1 - (lossImpactPct/100), expectedStreak); 
-    }
-
-    btnExec.disabled = true; 
-    warnBox.classList.remove('bg-red-700/95', 'bg-red-600/90', 'bg-brand', 'bg-amber-500/90');
-    warnBox.classList.add('hidden'); 
-    blWarning.classList.add('hidden'); 
-    if(document.getElementById('ind-cost')) document.getElementById('ind-cost').className = "absolute top-0 left-0 w-full h-0.5 bg-transparent"; 
-    if(document.getElementById('ind-risk')) document.getElementById('ind-risk').className = "absolute top-0 left-0 w-full h-0.5 bg-transparent";
-
-    if (buyingPower < 0) { 
-        warnBox.innerHTML = `🚨 <b>MARGIN DEFICIT:</b> Negative Buying Power.`; 
-        warnBox.className = "absolute top-0 left-0 w-full bg-red-700/95 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
-        warnBox.classList.remove('hidden'); 
-        actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
-        wl.valid = false; 
-        return; 
-    }
-
-    if (!wl.isTrancheValid) { 
-        warnBox.innerText = "Incomplete Tranche Prices!"; 
-        warnBox.className = "absolute top-0 left-0 w-full bg-amber-500/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
-        warnBox.classList.remove('hidden'); 
-        actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
-        wl.valid = false; 
-        return; 
-    }
-    
-    if (!wl.computedAEP || !wl.computedStop || !wl.ticker) { 
-        actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
-        return; 
-    }
-    
-    if (wl.computedStop >= wl.computedAEP) { 
-        warnBox.innerText = "Stop Loss must be below Entry!"; 
-        warnBox.className = "absolute top-0 left-0 w-full bg-red-600/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
-        warnBox.classList.remove('hidden'); 
-        return; 
-    }
-    
-    if (wl.computedTarget > 0 && wl.computedTarget <= wl.computedAEP) { 
-        warnBox.innerText = "Target must be > Entry."; 
-        warnBox.className = "absolute top-0 left-0 w-full bg-amber-500/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
-        warnBox.classList.remove('hidden'); 
-        actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
-        return; 
-    }
-
-    const costPerShare = wl.computedAEP * (1 + FEES.buy); 
-    const netStopPerShare = wl.computedStop * (1 - FEES.sell); 
-    const trueRiskPerShare = costPerShare - netStopPerShare;
-    
-    wl.cost = wl.shares * costPerShare; 
-    const actualRisk = wl.shares * trueRiskPerShare; 
-    const allocPct = masterCapital > 0 ? (wl.cost / masterCapital) * 100 : 0; 
-    
-    actualPosPctEl.innerText = `Actual Pos Size: ${allocPct.toFixed(2)}%`;
-
-    let rr = 0; let projProfit = 0; let winImpactPct = 0;
-    if (wl.computedTarget > wl.computedAEP) { 
-        const targetNetPerShare = wl.computedTarget * (1 - FEES.sell); 
-        rr = (targetNetPerShare - costPerShare) / trueRiskPerShare; 
-        projProfit = wl.shares * (targetNetPerShare - costPerShare); 
-        winImpactPct = masterCapital > 0 ? (projProfit / masterCapital) * 100 : 0; 
-    }
-
-    if(document.getElementById('o-cost')) document.getElementById('o-cost').innerText = fmtPHP(wl.cost); 
-    if(document.getElementById('o-risk')) document.getElementById('o-risk').innerText = fmtPHP(actualRisk); 
-    if(document.getElementById('o-impact-loss')) document.getElementById('o-impact-loss').innerText = `-${lossImpactPct.toFixed(2)}% Acct Impact`;
-    if(document.getElementById('o-profit')) document.getElementById('o-profit').innerText = fmtPHP(projProfit); 
-    if(document.getElementById('o-impact-win')) document.getElementById('o-impact-win').innerText = `+${winImpactPct.toFixed(2)}% Acct Impact`; 
-    if(document.getElementById('o-rr')) document.getElementById('o-rr').innerText = `${rr.toFixed(2)} R`;
-    
-    if (wl.shares > 0) {
-        const bl = getBoardLot(wl.computedAEP); 
+    try {
+        if (!Array.isArray(state.watchlist)) return;
+        const wl = state.watchlist.find(w => w.id === state.activeWlId); 
+        if(!wl) return;
         
-        if(idealSharesVaR <= idealSharesCap) {
-            if(document.getElementById('ind-risk')) document.getElementById('ind-risk').className = "absolute top-0 left-0 w-full h-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"; 
-        } else {
-            if(document.getElementById('ind-cost')) document.getElementById('ind-cost').className = "absolute top-0 left-0 w-full h-0.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]";
+        const sharesStr = document.getElementById('o-shares') ? document.getElementById('o-shares').value : '0'; 
+        const sharesInput = parseInt(sharesStr.replace(/,/g, '')) || 0; 
+        wl.shares = sharesInput;
+        
+        let engineResult = { buyingPower: 0, masterCapital: 0 };
+        try {
+            engineResult = runEngine(true);
+        } catch(e) {
+            console.error("Engine failed in calcTicketFromShares", e);
+        }
+        
+        const buyingPower = engineResult.buyingPower || 0;
+        const masterCapital = engineResult.masterCapital || 0;
+
+        const btnExec = document.getElementById('btn-execute'); 
+        const warnBox = document.getElementById('exec-warning'); 
+        const blWarning = document.getElementById('boardlot-warning'); 
+        const actualPosPctEl = document.getElementById('w-actual-pos-pct');
+        
+        if(!btnExec || !warnBox || !blWarning || !actualPosPctEl) return;
+
+        const costPerShareCheck = wl.computedAEP ? wl.computedAEP * (1 + FEES.buy) : 0;
+        const netStopPerShareCheck = wl.computedStop ? wl.computedStop * (1 - FEES.sell) : 0;
+        const trueRiskPerShareCheck = costPerShareCheck - netStopPerShareCheck;
+        const riskBudgetCheck = masterCapital * ((wl.varPct || 1) / 100);
+        const capBudgetCheck = masterCapital * ((wl.maxPosPct || 25) / 100);
+        
+        const idealSharesVaR = trueRiskPerShareCheck > 0 ? Math.floor(riskBudgetCheck / trueRiskPerShareCheck) : 0; 
+        const idealSharesCap = costPerShareCheck > 0 ? Math.floor(capBudgetCheck / costPerShareCheck) : 0;
+
+        let expectedDD = 0;
+        const lossImpactPct = masterCapital > 0 ? ((wl.shares * trueRiskPerShareCheck) / masterCapital) * 100 : 0;
+        const lossProb = 1 - (globalActualStats.wr > 0 ? globalActualStats.wr : 0.4); 
+        if(lossProb > 0 && lossProb < 1) { 
+            const expectedStreak = Math.log(100) / Math.log(1/lossProb); 
+            expectedDD = 1 - Math.pow(1 - (lossImpactPct/100), expectedStreak); 
         }
 
-        if (wl.shares % bl !== 0) { 
-            blWarning.innerText = `Invalid Board Lot. Multiple of ${bl.toLocaleString()} req.`; 
-            blWarning.classList.remove('hidden'); 
-            wl.valid = false; 
-        } else if (wl.cost > buyingPower) { 
-            warnBox.innerText = "Insufficient Buying Power"; 
-            warnBox.className = "absolute top-0 left-0 w-full bg-red-600/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
-            warnBox.classList.remove('hidden'); 
-            wl.valid = false; 
-        } else if (wl.shares > idealSharesVaR || wl.shares > idealSharesCap) { 
-            warnBox.innerHTML = `⚠️ <b>LIMIT EXCEEDED:</b> Allocating above pre-determined VaR or Max Pos. Proceed with caution.`; 
-            warnBox.className = "absolute top-0 left-0 w-full bg-amber-500/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
-            warnBox.classList.remove('hidden'); 
-            wl.valid = true; 
-            btnExec.disabled = false; 
-        } else if (expectedDD > 0.40) { 
-            warnBox.innerHTML = `💀 <b>KELLY CRITERION BREACH:</b> Size is lethal. Limit size!`; 
+        btnExec.disabled = true; 
+        warnBox.classList.remove('bg-red-700/95', 'bg-red-600/90', 'bg-brand', 'bg-amber-500/90');
+        warnBox.classList.add('hidden'); 
+        blWarning.classList.add('hidden'); 
+        if(document.getElementById('ind-cost')) document.getElementById('ind-cost').className = "absolute top-0 left-0 w-full h-0.5 bg-transparent"; 
+        if(document.getElementById('ind-risk')) document.getElementById('ind-risk').className = "absolute top-0 left-0 w-full h-0.5 bg-transparent";
+
+        if (buyingPower < 0) { 
+            warnBox.innerHTML = `🚨 <b>MARGIN DEFICIT:</b> Negative Buying Power.`; 
             warnBox.className = "absolute top-0 left-0 w-full bg-red-700/95 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
             warnBox.classList.remove('hidden'); 
-            wl.valid = true; 
-            btnExec.disabled = false; 
-        } else if (expectedDD > 0.25) { 
-            warnBox.innerHTML = `⚠️ <b>AI Warning:</b> High expected drawdown.`; 
+            actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
+            wl.valid = false; 
+            return; 
+        }
+
+        if (!wl.isTrancheValid) { 
+            warnBox.innerText = "Incomplete Tranche Prices!"; 
+            warnBox.className = "absolute top-0 left-0 w-full bg-amber-500/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
+            warnBox.classList.remove('hidden'); 
+            actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
+            wl.valid = false; 
+            return; 
+        }
+        
+        if (!wl.computedAEP || !wl.computedStop || !wl.ticker) { 
+            actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
+            return; 
+        }
+        
+        if (wl.computedStop >= wl.computedAEP) { 
+            warnBox.innerText = "Stop Loss must be below Entry!"; 
             warnBox.className = "absolute top-0 left-0 w-full bg-red-600/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
             warnBox.classList.remove('hidden'); 
-            wl.valid = true; 
-            btnExec.disabled = false; 
-        } else { 
-            warnBox.classList.add('hidden'); 
-            wl.valid = true; 
-            btnExec.disabled = false; 
+            return; 
         }
+        
+        if (wl.computedTarget > 0 && wl.computedTarget <= wl.computedAEP) { 
+            warnBox.innerText = "Target must be > Entry."; 
+            warnBox.className = "absolute top-0 left-0 w-full bg-amber-500/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
+            warnBox.classList.remove('hidden'); 
+            actualPosPctEl.innerText = `Actual Pos Size: 0.00%`; 
+            return; 
+        }
+
+        const costPerShare = wl.computedAEP * (1 + FEES.buy); 
+        const netStopPerShare = wl.computedStop * (1 - FEES.sell); 
+        const trueRiskPerShare = costPerShare - netStopPerShare;
+        
+        wl.cost = wl.shares * costPerShare; 
+        const actualRisk = wl.shares * trueRiskPerShare; 
+        const allocPct = masterCapital > 0 ? (wl.cost / masterCapital) * 100 : 0; 
+        
+        actualPosPctEl.innerText = `Actual Pos Size: ${allocPct.toFixed(2)}%`;
+
+        let rr = 0; let projProfit = 0; let winImpactPct = 0;
+        if (wl.computedTarget > wl.computedAEP) { 
+            const targetNetPerShare = wl.computedTarget * (1 - FEES.sell); 
+            rr = (targetNetPerShare - costPerShare) / trueRiskPerShare; 
+            projProfit = wl.shares * (targetNetPerShare - costPerShare); 
+            winImpactPct = masterCapital > 0 ? (projProfit / masterCapital) * 100 : 0; 
+        }
+
+        if(document.getElementById('o-cost')) document.getElementById('o-cost').innerText = fmtPHP(wl.cost); 
+        if(document.getElementById('o-risk')) document.getElementById('o-risk').innerText = fmtPHP(actualRisk); 
+        if(document.getElementById('o-impact-loss')) document.getElementById('o-impact-loss').innerText = `-${lossImpactPct.toFixed(2)}% Acct Impact`;
+        if(document.getElementById('o-profit')) document.getElementById('o-profit').innerText = fmtPHP(projProfit); 
+        if(document.getElementById('o-impact-win')) document.getElementById('o-impact-win').innerText = `+${winImpactPct.toFixed(2)}% Acct Impact`; 
+        if(document.getElementById('o-rr')) document.getElementById('o-rr').innerText = `${rr.toFixed(2)} R`;
+        
+        if (wl.shares > 0) {
+            const bl = getBoardLot(wl.computedAEP); 
+            
+            if(idealSharesVaR <= idealSharesCap) {
+                if(document.getElementById('ind-risk')) document.getElementById('ind-risk').className = "absolute top-0 left-0 w-full h-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"; 
+            } else {
+                if(document.getElementById('ind-cost')) document.getElementById('ind-cost').className = "absolute top-0 left-0 w-full h-0.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]";
+            }
+
+            if (wl.shares % bl !== 0) { 
+                blWarning.innerText = `Invalid Board Lot. Multiple of ${bl.toLocaleString()} req.`; 
+                blWarning.classList.remove('hidden'); 
+                wl.valid = false; 
+            } else if (wl.cost > buyingPower) { 
+                warnBox.innerText = "Insufficient Buying Power"; 
+                warnBox.className = "absolute top-0 left-0 w-full bg-red-600/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
+                warnBox.classList.remove('hidden'); 
+                wl.valid = false; 
+            } else if (wl.shares > idealSharesVaR || wl.shares > idealSharesCap) { 
+                warnBox.innerHTML = `⚠️ <b>LIMIT EXCEEDED:</b> Allocating above pre-determined VaR or Max Pos. Proceed with caution.`; 
+                warnBox.className = "absolute top-0 left-0 w-full bg-amber-500/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
+                warnBox.classList.remove('hidden'); 
+                wl.valid = true; 
+                btnExec.disabled = false; 
+            } else if (expectedDD > 0.40) { 
+                warnBox.innerHTML = `💀 <b>KELLY CRITERION BREACH:</b> Size is lethal. Limit size!`; 
+                warnBox.className = "absolute top-0 left-0 w-full bg-red-700/95 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
+                warnBox.classList.remove('hidden'); 
+                wl.valid = true; 
+                btnExec.disabled = false; 
+            } else if (expectedDD > 0.25) { 
+                warnBox.innerHTML = `⚠️ <b>AI Warning:</b> High expected drawdown.`; 
+                warnBox.className = "absolute top-0 left-0 w-full bg-red-600/90 text-white text-[10px] font-bold text-center py-0.5 uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300";
+                warnBox.classList.remove('hidden'); 
+                wl.valid = true; 
+                btnExec.disabled = false; 
+            } else { 
+                warnBox.classList.add('hidden'); 
+                wl.valid = true; 
+                btnExec.disabled = false; 
+            }
+        }
+    } catch(e) {
+        console.error("Error in calcTicketFromShares:", e);
     }
 }
 
 function executeTrade() { 
+    if (!Array.isArray(state.watchlist)) return;
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
     if (!wl || !wl.valid) return; 
+    
+    if (!Array.isArray(state.activeHoldings)) state.activeHoldings = [];
     
     state.activeHoldings.push({ 
         id: Date.now(), 
@@ -1290,9 +1388,9 @@ function executeTrade() {
         currentPrice: wl.computedAEP, 
         image: wl.image,
         targetType: wl.targetType,
-        targetEntries: [...wl.targetEntries],
+        targetEntries: [...(wl.targetEntries || [0,0])],
         stopType: wl.stopType,
-        stopEntries: [...wl.stopEntries]
+        stopEntries: [...(wl.stopEntries || [0,0])]
     }); 
     
     const freshWl = createEmptyWl(wl.id); 
@@ -1312,7 +1410,7 @@ function renderLedgers() {
     if(!fBody) return;
     fBody.innerHTML = '';
     
-    if (state.ledger.length === 0) { 
+    if (!Array.isArray(state.ledger) || state.ledger.length === 0) { 
         fBody.innerHTML = `
             <tr><td colspan="4">
                 <div class="glass-panel m-4 p-8 rounded-2xl flex flex-col items-center justify-center text-center">
@@ -1343,7 +1441,7 @@ function renderLedgers() {
     if(!jBody) return;
     jBody.innerHTML = '';
     
-    if (state.journal.length === 0) {
+    if (!Array.isArray(state.journal) || state.journal.length === 0) {
         jBody.innerHTML = `
             <tr><td colspan="6">
                 <div class="glass-panel m-4 p-8 rounded-2xl flex flex-col items-center justify-center text-center">
@@ -1375,6 +1473,7 @@ function renderLedgers() {
 }
 
 function openCloseModal(id) { 
+    if (!Array.isArray(state.activeHoldings)) return;
     const pos = state.activeHoldings.find(p => p.id === id); 
     if(!pos) return;
 
@@ -1412,6 +1511,7 @@ function openCloseModal(id) {
 
 function setCloseShares(pct) {
     const id = parseInt(document.getElementById('close-id').value);
+    if (!Array.isArray(state.activeHoldings)) return;
     const pos = state.activeHoldings.find(p => p.id === id);
     if(pos) {
         if(pct === 1.0) {
@@ -1439,6 +1539,7 @@ function confirmCloseTrade() {
     const sharesToClose = parseInt(document.getElementById('close-shares').value);
     
     if(isNaN(exit) || exit <= 0) return alert("Invalid execution price."); 
+    if (!Array.isArray(state.activeHoldings)) return;
     
     const idx = state.activeHoldings.findIndex(p => p.id === id); 
     if(idx > -1) { 
@@ -1455,6 +1556,8 @@ function confirmCloseTrade() {
         
         const { masterCapital } = runEngine(true);
         const recordedPosPct = masterCapital > 0 ? (proportionalCost / masterCapital) : 0;
+        
+        if (!Array.isArray(state.journal)) state.journal = [];
         
         state.journal.push({ 
             id: Date.now(), 
@@ -1483,6 +1586,7 @@ function confirmCloseTrade() {
 }
 
 function deleteJournalEntry(id) { 
+    if (!Array.isArray(state.journal)) return;
     const idx = state.journal.findIndex(t => t.id === id); 
     if(idx > -1) { 
         state.journal.splice(idx, 1); 
@@ -1507,6 +1611,8 @@ function submitLedger() {
 
     const dateInput = document.getElementById('modal-date').value;
     const finalDate = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
+
+    if (!Array.isArray(state.ledger)) state.ledger = [];
 
     state.ledger.push({ 
         id: Date.now(), 
@@ -1618,41 +1724,43 @@ function runSimulatorCore() {
         expectedMaxDD = 1 - Math.pow(1 - lossPerTrade, expectedLosingStreak); 
     }
 
-    document.getElementById('out-rbaf-goal').innerText = fmtPHP(pesoGoal); 
-    document.getElementById('out-rbaf-trades').innerText = portEvPct > 0 ? Math.ceil(tradesNeeded).toLocaleString() : "Impossible"; 
-    document.getElementById('out-rbaf-time').innerText = timeStr;
-    document.getElementById('out-rbaf-pospeso').innerText = fmtPHP(posSizePeso); 
-    document.getElementById('out-rbaf-idealvar').innerText = `${idealVar.toFixed(2)}%`; 
-    document.getElementById('out-rbaf-enp').innerText = `${(portEvPct * 100).toFixed(2)}%`;
-    document.getElementById('out-rbaf-losses').innerText = portEvPct > 0 ? Math.floor(lossesNeeded).toLocaleString() : "-"; 
-    document.getElementById('out-rbaf-streak').innerText = Math.round(expectedLosingStreak); 
-    document.getElementById('out-rbaf-dd').innerText = `-${(expectedMaxDD * 100).toFixed(1)}%`;
+    if(document.getElementById('out-rbaf-goal')) document.getElementById('out-rbaf-goal').innerText = fmtPHP(pesoGoal); 
+    if(document.getElementById('out-rbaf-trades')) document.getElementById('out-rbaf-trades').innerText = portEvPct > 0 ? Math.ceil(tradesNeeded).toLocaleString() : "Impossible"; 
+    if(document.getElementById('out-rbaf-time')) document.getElementById('out-rbaf-time').innerText = timeStr;
+    if(document.getElementById('out-rbaf-pospeso')) document.getElementById('out-rbaf-pospeso').innerText = fmtPHP(posSizePeso); 
+    if(document.getElementById('out-rbaf-idealvar')) document.getElementById('out-rbaf-idealvar').innerText = `${idealVar.toFixed(2)}%`; 
+    if(document.getElementById('out-rbaf-enp')) document.getElementById('out-rbaf-enp').innerText = `${(portEvPct * 100).toFixed(2)}%`;
+    if(document.getElementById('out-rbaf-losses')) document.getElementById('out-rbaf-losses').innerText = portEvPct > 0 ? Math.floor(lossesNeeded).toLocaleString() : "-"; 
+    if(document.getElementById('out-rbaf-streak')) document.getElementById('out-rbaf-streak').innerText = Math.round(expectedLosingStreak); 
+    if(document.getElementById('out-rbaf-dd')) document.getElementById('out-rbaf-dd').innerText = `-${(expectedMaxDD * 100).toFixed(1)}%`;
 
     const ddBox = document.getElementById('out-rbaf-dd-box');
     const ddLbl = document.getElementById('out-rbaf-dd-lbl');
     const ddVal = document.getElementById('out-rbaf-dd');
 
-    ddBox.className = 'p-3 lg:p-4 rounded-lg border shadow-inner relative group hover:z-50 transition-colors duration-300';
-    ddLbl.className = 'text-[8px] uppercase font-bold tracking-widest mb-1 flex justify-between items-center transition-colors duration-300';
-    ddVal.className = 'text-2xl font-mono font-black truncate mt-1 transition-colors duration-300';
+    if(ddBox && ddLbl && ddVal) {
+        ddBox.className = 'p-3 lg:p-4 rounded-lg border shadow-inner relative group hover:z-50 transition-colors duration-300';
+        ddLbl.className = 'text-[8px] uppercase font-bold tracking-widest mb-1 flex justify-between items-center transition-colors duration-300';
+        ddVal.className = 'text-2xl font-mono font-black truncate mt-1 transition-colors duration-300';
 
-    if (expectedMaxDD >= 0.20) {
-        ddBox.classList.add('bg-red-100', 'dark:bg-red-950/80', 'border-red-500', 'shadow-[0_0_15px_rgba(239,68,68,0.2)]');
-        ddLbl.classList.add('text-red-700', 'dark:text-red-400');
-        ddVal.classList.add('text-red-700', 'dark:text-red-500');
-    } else if (expectedMaxDD >= 0.15) {
-        ddBox.classList.add('bg-amber-50', 'dark:bg-amber-950/40', 'border-amber-300', 'dark:border-amber-900');
-        ddLbl.classList.add('text-amber-600', 'dark:text-amber-500');
-        ddVal.classList.add('text-amber-600', 'dark:text-amber-400');
-    } else {
-        ddBox.classList.add('bg-slate-100', 'dark:bg-slate-800/80', 'border-slate-300', 'dark:border-slate-600/50');
-        ddLbl.classList.add('text-slate-600', 'dark:text-slate-400');
-        ddVal.classList.add('text-slate-800', 'dark:text-slate-300');
+        if (expectedMaxDD >= 0.20) {
+            ddBox.classList.add('bg-red-100', 'dark:bg-red-950/80', 'border-red-500', 'shadow-[0_0_15px_rgba(239,68,68,0.2)]');
+            ddLbl.classList.add('text-red-700', 'dark:text-red-400');
+            ddVal.classList.add('text-red-700', 'dark:text-red-500');
+        } else if (expectedMaxDD >= 0.15) {
+            ddBox.classList.add('bg-amber-50', 'dark:bg-amber-950/40', 'border-amber-300', 'dark:border-amber-900');
+            ddLbl.classList.add('text-amber-600', 'dark:text-amber-500');
+            ddVal.classList.add('text-amber-600', 'dark:text-amber-400');
+        } else {
+            ddBox.classList.add('bg-slate-100', 'dark:bg-slate-800/80', 'border-slate-300', 'dark:border-slate-600/50');
+            ddLbl.classList.add('text-slate-600', 'dark:text-slate-400');
+            ddVal.classList.add('text-slate-800', 'dark:text-slate-300');
+        }
     }
 
     const narrativeEl = document.getElementById('diag-text'); 
     let dText = ""; 
-    const totalJournals = state.journal.length;
+    const totalJournals = Array.isArray(state.journal) ? state.journal.length : 0;
 
     if (totalJournals === 0) { 
         dText = "Waiting for data. Using Sandbox defaults until you log closed trades in your Ledgers tab."; 
@@ -1668,13 +1776,15 @@ function runSimulatorCore() {
         dText = `✅ <span class='font-bold text-brand'>Positive Expectancy Confirmed.</span> Your compounding blueprint is sound. Your expected drawdown is a manageable <span class='font-mono'>-${(expectedMaxDD*100).toFixed(1)}%</span>.`; 
     }
 
-    narrativeEl.innerHTML = dText; 
+    if(narrativeEl) narrativeEl.innerHTML = dText; 
     
     const narrativeTop = document.getElementById('rbaf-narrative');
-    if (portEvPct > 0) { 
-        narrativeTop.innerHTML = `To generate <span class="font-bold">${fmtPHP(pesoGoal)}</span> in <span class="font-bold">${timeStr}</span>, your math requires <span class="font-bold">${Math.ceil(tradesNeeded).toLocaleString()} total trades</span>. You must execute <span class="text-brand font-bold">${Math.ceil(winsNeeded).toLocaleString()} winning trades</span> while preparing to absorb <span class="text-red-500 font-bold">${Math.floor(lossesNeeded).toLocaleString()} statistical losses</span>. Your Current Average VaR is <span class="text-blue-500 font-bold">${idealVar.toFixed(2)}%</span>, projecting a maximum expected drawdown of <span class="text-red-500 font-bold">-${(expectedMaxDD * 100).toFixed(1)}%</span>. Your Gain/Loss ratio is <span class="font-bold">${glRatio.toFixed(2)}:1</span>.`; 
-    } else { 
-        narrativeTop.innerHTML = `<span class="text-red-500 font-bold">Mathematical Drain.</span> Your Expected Growth is negative. Hitting your goal is mathematically impossible.`; 
+    if (narrativeTop) {
+        if (portEvPct > 0) { 
+            narrativeTop.innerHTML = `To generate <span class="font-bold">${fmtPHP(pesoGoal)}</span> in <span class="font-bold">${timeStr}</span>, your math requires <span class="font-bold">${Math.ceil(tradesNeeded).toLocaleString()} total trades</span>. You must execute <span class="text-brand font-bold">${Math.ceil(winsNeeded).toLocaleString()} winning trades</span> while preparing to absorb <span class="text-red-500 font-bold">${Math.floor(lossesNeeded).toLocaleString()} statistical losses</span>. Your Current Average VaR is <span class="text-blue-500 font-bold">${idealVar.toFixed(2)}%</span>, projecting a maximum expected drawdown of <span class="text-red-500 font-bold">-${(expectedMaxDD * 100).toFixed(1)}%</span>. Your Gain/Loss ratio is <span class="font-bold">${glRatio.toFixed(2)}:1</span>.`; 
+        } else { 
+            narrativeTop.innerHTML = `<span class="text-red-500 font-bold">Mathematical Drain.</span> Your Expected Growth is negative. Hitting your goal is mathematically impossible.`; 
+        }
     }
 
     const chartData = calculateSimChartData(portSize, portEvPct, tradesNeeded, pesoGoal, totalHorizonTrades, tradesPerYear); 
@@ -1798,13 +1908,15 @@ function drawSimChart(data) {
 function openStrategyModal() { 
     const list = document.getElementById('strategy-list'); 
     list.innerHTML = ''; 
-    state.strategies.forEach((s, idx) => { 
-        list.innerHTML += `
-            <div class="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span class="text-sm font-bold text-slate-800 dark:text-white" style="color: ${getStratColor(s)}">${s}</span>
-                <button onclick="deleteStrategy(${idx})" class="text-slate-400 hover:text-red-500 text-xs px-2">✕</button>
-            </div>`; 
-    }); 
+    if(Array.isArray(state.strategies)) {
+        state.strategies.forEach((s, idx) => { 
+            list.innerHTML += `
+                <div class="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span class="text-sm font-bold text-slate-800 dark:text-white" style="color: ${getStratColor(s)}">${s}</span>
+                    <button onclick="deleteStrategy(${idx})" class="text-slate-400 hover:text-red-500 text-xs px-2">✕</button>
+                </div>`; 
+        }); 
+    }
     
     const m = document.getElementById('strategy-modal'); 
     const c = document.getElementById('strategy-content'); 
@@ -1825,8 +1937,9 @@ function closeStrategyModal() {
 
 function addStrategy() { 
     const val = document.getElementById('new-strategy-input').value.trim(); 
-    if(!val || state.strategies.includes(val)) return; 
+    if(!val || (Array.isArray(state.strategies) && state.strategies.includes(val))) return; 
     
+    if(!Array.isArray(state.strategies)) state.strategies = [];
     state.strategies.push(val); 
     document.getElementById('new-strategy-input').value = ''; 
     openStrategyModal(); 
@@ -1836,9 +1949,13 @@ function addStrategy() {
 }
 
 function deleteStrategy(idx) { 
-    if(state.strategies.length <= 1) return alert("Must have at least one strategy."); 
+    if(!Array.isArray(state.strategies) || state.strategies.length <= 1) return alert("Must have at least one strategy."); 
     const stratName = state.strategies[idx]; 
-    const isUsed = state.activeHoldings.some(h => h.strategy === stratName); 
+    
+    let isUsed = false;
+    if(Array.isArray(state.activeHoldings)) {
+        isUsed = state.activeHoldings.some(h => h.strategy === stratName); 
+    }
     
     if(isUsed) return alert("Cannot delete a strategy while it is being used in an Open Trade."); 
     
@@ -1879,21 +1996,29 @@ function handleImageUpload(e) {
     if(e.target.files.length > 0) {
         const reader = new FileReader();
         reader.onload = (ev) => {
-            state.watchlist.find(w => w.id === state.activeWlId).image = ev.target.result;
-            loadWlTab(state.activeWlId);
+            if(!Array.isArray(state.watchlist)) return;
+            const wl = state.watchlist.find(w => w.id === state.activeWlId);
+            if(wl) {
+                wl.image = ev.target.result;
+                loadWlTab(state.activeWlId);
+            }
         };
         reader.readAsDataURL(e.target.files[0]);
     }
 }
 
 window.addEventListener('paste', e => {
-    if(document.getElementById('view-allocator').classList.contains('hidden')) return;
+    if(document.getElementById('view-allocator') && document.getElementById('view-allocator').classList.contains('hidden')) return;
     
     if(e.clipboardData.files.length > 0 && e.clipboardData.files[0].type.startsWith('image/')) { 
         const reader = new FileReader(); 
         reader.onload = (ev) => { 
-            state.watchlist.find(w => w.id === state.activeWlId).image = ev.target.result; 
-            loadWlTab(state.activeWlId); 
+            if(!Array.isArray(state.watchlist)) return;
+            const wl = state.watchlist.find(w => w.id === state.activeWlId);
+            if(wl) {
+                wl.image = ev.target.result; 
+                loadWlTab(state.activeWlId); 
+            }
         }; 
         reader.readAsDataURL(e.clipboardData.files[0]); 
     }
@@ -1901,8 +2026,12 @@ window.addEventListener('paste', e => {
 
 function clearImage(e) { 
     e.stopPropagation(); 
-    state.watchlist.find(w => w.id === state.activeWlId).image = null; 
-    loadWlTab(state.activeWlId); 
+    if(!Array.isArray(state.watchlist)) return;
+    const wl = state.watchlist.find(w => w.id === state.activeWlId);
+    if(wl) {
+        wl.image = null; 
+        loadWlTab(state.activeWlId); 
+    }
 }
 
 function viewImage(src) { 
