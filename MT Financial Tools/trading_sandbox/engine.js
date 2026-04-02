@@ -168,7 +168,7 @@ let state = {
     journal: []
 };
 
-let globalActualStats = { wr: 0.40, avgGainPct: 0.08, avgLossPct: -0.05, posSizePct: 0.20 };
+let globalActualStats = { wr: 0, avgGainPct: 0, avgLossPct: 0, posSizePct: 0 };
 let undoStack = []; 
 let isUndoAction = false;
 
@@ -197,6 +197,7 @@ function undo() {
     const activeNav = document.querySelector('.nav-item.active').id.replace('nav-', '');
     switchView(activeNav);
     isUndoAction = false;
+    saveData(); // Sync the time-travel to the cloud
 }
 
 // ==========================================
@@ -456,8 +457,8 @@ function runEngine(skipGallery = false) {
             
             globalActualStats.posSizePct = state.journal.reduce((s,t) => s + (t.posSizePct !== undefined ? t.posSizePct : 0), 0) / total;
         } else {
-            // Restore sandbox defaults so projections work immediately
-            globalActualStats = { wr: 0.40, avgGainPct: 0.08, avgLossPct: -0.05, posSizePct: 0.20 };
+            // Purged Ghost Data: Default to strict zeroes for clean start.
+            globalActualStats = { wr: 0, avgGainPct: 0, avgLossPct: 0, posSizePct: 0 };
         }
 
         updateDials();
@@ -1382,6 +1383,8 @@ function executeTrade() {
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
     if (!wl || !wl.valid) return; 
     
+    saveState();
+    
     if (!Array.isArray(state.activeHoldings)) state.activeHoldings = [];
     
     state.activeHoldings.push({ 
@@ -1555,6 +1558,8 @@ function confirmCloseTrade() {
             return alert(`Invalid shares. Enter between 1 and ${pos.shares}.`);
         }
 
+        saveState();
+
         const grossVal = sharesToClose * exit; 
         const netVal = grossVal * (1 - FEES.sell); 
         const proportionalCost = sharesToClose * pos.avgCost * (1 + FEES.buy);
@@ -1595,6 +1600,7 @@ function deleteJournalEntry(id) {
     if (!Array.isArray(state.journal)) return;
     const idx = state.journal.findIndex(t => t.id === id); 
     if(idx > -1) { 
+        saveState();
         state.journal.splice(idx, 1); 
         runEngine(); 
         renderLedgers(); 
@@ -1614,6 +1620,8 @@ function submitLedger() {
             return alert("Insufficient equity. You cannot withdraw more than your Current Total Equity.");
         }
     }
+
+    saveState();
 
     const dateInput = document.getElementById('modal-date').value;
     const finalDate = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
@@ -1769,7 +1777,7 @@ function runSimulatorCore() {
     const totalJournals = Array.isArray(state.journal) ? state.journal.length : 0;
 
     if (totalJournals === 0) { 
-        dText = "Waiting for data. Using Sandbox defaults until you log closed trades in your Ledgers tab."; 
+        dText = "Awaiting real data. Your Expectancy Matrix and Diagnostic AI will automatically calibrate once you log closed trades in your Ledgers tab."; 
     } else if (portEvPct <= 0) { 
         dText = `🚨 <span class='font-bold text-red-600 dark:text-red-400'>Mathematical Drain.</span> Reaching your goal is mathematically impossible right now. Because your Average Loss is too large compared to your Win Rate and Average Gain, your system is actively bleeding capital. To fix this, you must ruthlessly tighten your Stop Loss so your losers are a fraction of the size of your winners.`; 
     } else if (expectedMaxDD >= 0.40) { 
@@ -1945,6 +1953,7 @@ function addStrategy() {
     const val = document.getElementById('new-strategy-input').value.trim(); 
     if(!val || (Array.isArray(state.strategies) && state.strategies.includes(val))) return; 
     
+    saveState();
     if(!Array.isArray(state.strategies)) state.strategies = [];
     state.strategies.push(val); 
     document.getElementById('new-strategy-input').value = ''; 
@@ -1967,6 +1976,7 @@ function deleteStrategy(idx) {
     
     if(!confirm(`Are you sure you want to permanently delete the "${stratName}" strategy?`)) return;
 
+    saveState();
     state.strategies.splice(idx, 1); 
     openStrategyModal(); 
     populateStrategyDropdowns(); 
