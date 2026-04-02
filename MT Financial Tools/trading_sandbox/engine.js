@@ -30,6 +30,17 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
+// V2.14 Defensive Architecture: Actively heals missing or corrupted arrays from old save files
+function healState() {
+    if (!state.strategies || state.strategies.length === 0) {
+        state.strategies = ['Breakout', 'Bounce Play', 'Swing'];
+    }
+    if (!state.activeHoldings) state.activeHoldings = [];
+    if (!state.watchlist) state.watchlist = [];
+    if (!state.journal) state.journal = [];
+    if (!state.ledger) state.ledger = [];
+}
+
 async function loadCloudProfile() {
     try {
         const docRef = doc(db, 'users', currentUser.uid);
@@ -40,16 +51,13 @@ async function loadCloudProfile() {
             
             if (data.tradingSandboxState) {
                 state = data.tradingSandboxState;
+                healState();
                 
                 // Trading Sandbox check: Does the ledger have entries?
                 if (state.ledger && state.ledger.length > 0) {
                     document.getElementById('init-modal').classList.add('hidden');
                     runEngine();
-                    populateStrategyDropdowns();
-                    renderWlTabs();
-                    if(state.watchlist.length > 0) {
-                        loadWlTab(state.activeWlId);
-                    }
+                    initPlanner();
                     switchView('dashboard');
                 } else {
                     console.log("Empty save. Forcing Welcome Screen.");
@@ -158,6 +166,7 @@ function undo() {
     if (undoStack.length === 0) return;
     isUndoAction = true; 
     state = JSON.parse(undoStack.pop());
+    healState();
     
     if (undoStack.length === 0) {
         document.getElementById('btn-undo').disabled = true;
@@ -166,15 +175,7 @@ function undo() {
     }
     
     runEngine(); 
-    populateStrategyDropdowns(); 
-    renderWlTabs();
-    
-    if(state.watchlist.findIndex(w => w.id === state.activeWlId) === -1 && state.watchlist.length > 0) {
-        state.activeWlId = state.watchlist[0].id;
-    }
-    if(state.watchlist.length > 0) {
-        loadWlTab(state.activeWlId);
-    }
+    initPlanner(); 
     
     const activeNav = document.querySelector('.nav-item.active').id.replace('nav-', '');
     switchView(activeNav);
@@ -255,7 +256,8 @@ function loadData(event) {
     const reader = new FileReader();
     reader.onload = function(e) { 
         try { 
-            state = JSON.parse(e.target.result); 
+            state = JSON.parse(e.target.result);
+            healState(); 
             exploreSandbox(); 
         } catch(err) { 
             alert("Invalid save file."); 
@@ -325,6 +327,7 @@ function executeNuclearReset() {
     state.journal = []; 
     state.watchlist = []; 
     state.activeWlId = null;
+    healState();
     
     hideResetModal();
     showStartFresh(); 
@@ -346,6 +349,7 @@ function confirmReset() {
     state.journal = []; 
     state.watchlist = []; 
     state.activeWlId = null;
+    healState();
     exploreSandbox();
 }
 
@@ -687,7 +691,6 @@ function renderDashboardCharts() {
 // ==========================================
 // 7. ACTIVE HOLDINGS GALLERY
 // ==========================================
-// V2.14 Fix: Dynamic "Add Chart" upload button for active holdings missing an image
 function renderHoldingsGallery(masterCapital) {
     const container = document.getElementById('holdings-gallery'); 
     if(!container) return;
@@ -758,7 +761,6 @@ function renderHoldingsGallery(masterCapital) {
     });
 }
 
-// V2.14 Helper: Processes the file input from the Gallery card
 function handleGalleryUpload(e, id) {
     if(e.target.files.length > 0) {
         const reader = new FileReader();
@@ -767,7 +769,7 @@ function handleGalleryUpload(e, id) {
             if (pos) {
                 pos.image = ev.target.result;
                 saveState();
-                runEngine(false); // Update gallery with the new image
+                runEngine(false); 
             }
         };
         reader.readAsDataURL(e.target.files[0]);
@@ -841,10 +843,15 @@ function populateStrategyDropdowns() {
 
 function initPlanner() {
     populateStrategyDropdowns();
-    if (state.watchlist.length === 0) { 
-        state.watchlist.push(createEmptyWl(Date.now())); 
+    
+    // V2.14 Defensive Architecture: Prevents loadWlTab from ever crashing on an undefined or out-of-sync activeWlId
+    if (!state.watchlist || state.watchlist.length === 0) { 
+        state.watchlist = [createEmptyWl(Date.now())]; 
         state.activeWlId = state.watchlist[0].id; 
+    } else if (!state.watchlist.find(w => w.id === state.activeWlId)) {
+        state.activeWlId = state.watchlist[0].id;
     }
+    
     renderWlTabs(); 
     loadWlTab(state.activeWlId);
 }
@@ -877,7 +884,17 @@ function renderWlTabs() {
 
 function loadWlTab(id) {
     state.activeWlId = id; 
-    const wl = state.watchlist.find(w => w.id === id);
+    
+    // V2.14 Defensive Architecture: Fail-safe to ensure wl is never undefined
+    let wl = state.watchlist.find(w => w.id === id);
+    if (!wl) {
+        if (state.watchlist.length > 0) {
+            wl = state.watchlist[0];
+            state.activeWlId = wl.id;
+        } else {
+            return; 
+        }
+    }
     
     document.getElementById('w-ticker').value = wl.ticker; 
     document.getElementById('w-sector').value = wl.sector || 'Others';
@@ -1802,7 +1819,6 @@ function deleteStrategy(idx) {
     
     if(isUsed) return alert("Cannot delete a strategy while it is being used in an Open Trade."); 
     
-    // V2.14 Fix: Explicit Confirmation Guardrail
     if(!confirm(`Are you sure you want to permanently delete the "${stratName}" strategy?`)) return;
 
     saveState(); 
@@ -1834,6 +1850,17 @@ function closeLedger() {
     modal.classList.add('opacity-0'); 
     content.classList.add('scale-95'); 
     setTimeout(() => modal.classList.add('hidden'), 300); 
+}
+
+function handleImageUpload(e) {
+    if(e.target.files.length > 0) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            state.watchlist.find(w => w.id === state.activeWlId).image = ev.target.result;
+            loadWlTab(state.activeWlId);
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    }
 }
 
 window.addEventListener('paste', e => {
@@ -1917,3 +1944,10 @@ window.clearImage = clearImage;
 window.viewImage = viewImage;
 window.closeImage = closeImage;
 window.formatNumberInput = formatNumberInput;
+window.updateTranche = updateTranche;
+window.updateStop = updateStop;
+window.updateTarget = updateTarget;
+window.limitPosSize = limitPosSize;
+window.handleMktPriceInput = handleMktPriceInput;
+window.handleGalleryUpload = handleGalleryUpload;
+window.handleImageUpload = handleImageUpload;
