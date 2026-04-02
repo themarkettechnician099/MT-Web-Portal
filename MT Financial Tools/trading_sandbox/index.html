@@ -621,7 +621,7 @@
                             <div class="glass-panel p-4 lg:p-6 rounded-2xl flex flex-col gap-4 border-t-4 border-t-brand relative h-full justify-center" id="exec-ticket">
                                 <div id="exec-warning" class="absolute top-0 left-0 w-full bg-amber-500/90 text-white text-[10px] font-bold text-center py-0.5 hidden uppercase tracking-widest z-10 rounded-tr-xl rounded-tl-xl transition-all duration-300">Warning Message</div>
                                 
-                                <div class="flex justify-between items-end mt-2 lg:mt-1">
+                                <div class="flex justify-between items-end mt-2 lg:mt-1 mb-4">
                                     <div class="w-1/2 relative">
                                         <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">Shares to Buy <span class="text-slate-400 normal-case ml-1">(Lot: <span id="w-boardlot">0</span>)</span></p>
                                         <input type="text" id="o-shares" class="w-[90%] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-xl lg:text-2xl font-mono font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-brand outline-none transition-all" value="0" oninput="userEditedShares(this)">
@@ -634,16 +634,7 @@
                                     </div>
                                 </div>
 
-                                <button onclick="document.getElementById('trade-summary-box').classList.toggle('hidden')" class="w-full lg:hidden py-2 mt-4 bg-slate-100 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700/50 text-brand rounded-lg text-[10px] font-bold uppercase tracking-widest transition flex justify-center items-center gap-2 border border-slate-200 dark:border-slate-700/50 active:scale-95 outline-none">
-                                    📝 View Trade Summary
-                                </button>
-
-                                <div id="trade-summary-box" class="hidden lg:block bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-lg p-3 lg:p-4 mt-4 lg:mt-4 shadow-inner text-[11px] lg:text-xs text-slate-600 dark:text-slate-400 leading-relaxed transition-all">
-                                    <p id="summary-p1" class="mb-2">Awaiting valid trade parameters to generate summary...</p>
-                                    <p id="summary-p2"></p>
-                                </div>
-
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4 lg:mt-0">
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                                     <div class="bg-slate-100 dark:bg-slate-900/60 p-4 rounded-lg border border-slate-200 dark:border-slate-700/50 flex flex-col justify-center relative overflow-hidden" id="box-cost">
                                         <div id="ind-cost" class="absolute top-0 left-0 w-full h-0.5 bg-transparent"></div>
                                         <p class="text-[9px] text-slate-500 uppercase font-bold tracking-widest mb-1">Est. Cost</p>
@@ -665,6 +656,15 @@
                                 <button onclick="executeTrade()" id="btn-execute" class="w-full py-4 mt-2 bg-brand hover:bg-green-700 text-white rounded-lg font-black uppercase tracking-widest text-sm shadow-lg transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
                                     Execute & Send to Dashboard ➔
                                 </button>
+                                
+                                <button onclick="document.getElementById('trade-summary-box').classList.toggle('hidden')" class="w-full lg:hidden py-2 bg-slate-100 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700/50 text-brand rounded-lg text-[10px] font-bold uppercase tracking-widest transition flex justify-center items-center gap-2 border border-slate-200 dark:border-slate-700/50 active:scale-95 outline-none">
+                                    📝 View Trade Summary
+                                </button>
+
+                                <div id="trade-summary-box" class="hidden lg:block bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-lg p-3 lg:p-4 shadow-inner text-[11px] lg:text-xs text-slate-600 dark:text-slate-400 leading-relaxed transition-all flex-1">
+                                    <p id="summary-p1" class="mb-2">Awaiting valid trade parameters to generate summary...</p>
+                                    <p id="summary-p2"></p>
+                                </div>
                             </div>
                         </div>
                     </div>
