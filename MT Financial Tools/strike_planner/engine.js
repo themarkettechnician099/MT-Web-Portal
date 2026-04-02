@@ -30,6 +30,44 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
+function completeLoadingScreen() {
+    const bar = document.getElementById('loading-progress');
+    const screen = document.getElementById('loading-screen');
+    if (bar) bar.style.width = '100%';
+    setTimeout(() => {
+        if (screen) {
+            screen.classList.add('opacity-0');
+            setTimeout(() => screen.classList.add('hidden'), 300);
+        }
+    }, 200);
+}
+
+function healState() {
+    const enforceArray = (data, defaultData) => {
+        if (!data) return defaultData;
+        if (Array.isArray(data)) return data.filter(item => item !== null && item !== undefined);
+        if (typeof data === 'object') return Object.values(data).filter(item => item !== null && item !== undefined);
+        return defaultData;
+    };
+
+    state.sets = enforceArray(state.sets, []);
+    
+    state.sets.forEach(s => {
+        if (!['100', '50-50', '50-30-20'].includes(s.trancheType)) s.trancheType = '100';
+        if (!['100', '50-50'].includes(s.stopType)) s.stopType = '100';
+        if (!['100', '50-50'].includes(s.targetType)) s.targetType = '100';
+
+        s.entries = enforceArray(s.entries, [0, 0, 0]);
+        s.stopEntries = enforceArray(s.stopEntries, [0, 0]);
+        s.targetEntries = enforceArray(s.targetEntries, [0, 0]);
+        
+        if (!s.sector) s.sector = 'Others';
+        s.varPct = parseFloat(s.varPct) || 1.0;
+        s.maxPosPct = parseFloat(s.maxPosPct) || 25.0;
+        s.image = s.image || null; // Force null instead of undefined
+    });
+}
+
 async function loadCloudProfile() {
     try {
         const docRef = doc(db, 'users', currentUser.uid);
@@ -37,43 +75,34 @@ async function loadCloudProfile() {
         
         if (docSnap.exists()) {
             const data = docSnap.data();
+            const cloudState = data.strikePlannerState || data.state;
             
-            if (data.strikePlannerState) {
-                state = data.strikePlannerState;
+            if (cloudState) {
+                state = cloudState;
+                healState(); // FIREWALL: Scrub the data
                 
-                // THE FIX: Only hide the modal if the saved capital is actually greater than 0
                 if (state.startingCapital > 0) {
+                    if(!state.sets.find(s => s.id === state.activeSetId) && state.sets.length > 0) {
+                        state.activeSetId = state.sets[0].id;
+                    }
                     document.getElementById('init-modal').classList.add('hidden');
-                    runEngine();
-                    renderTabs();
-                    buildSetForm();
-                    switchView('dashboard');
+                    runEngine(); renderTabs(); buildSetForm(); switchView('dashboard');
+                    completeLoadingScreen();
                 } else {
-                    console.log("Poisoned save found (0 capital). Forcing Welcome Screen.");
-                    document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
-                }
-                
-            } else if (data.state) { // Fallback for legacy format if needed
-                state = data.state;
-                if (state.startingCapital > 0) {
-                    document.getElementById('init-modal').classList.add('hidden');
-                    runEngine();
-                    renderTabs();
-                    buildSetForm();
-                    switchView('dashboard');
-                } else {
+                    completeLoadingScreen();
                     document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
                 }
             } else {
-                console.log("No Strike Planner data yet. Leaving Welcome Screen open.");
+                completeLoadingScreen();
                 document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
             }
         } else {
-            console.log("No cloud profile found. Ready for initialization.");
+            completeLoadingScreen();
             document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
         }
     } catch (error) {
         console.error("Error loading cloud data:", error);
+        completeLoadingScreen();
     }
 }
 
@@ -128,7 +157,7 @@ function saveSnapshot() {
     document.getElementById('mob-btn-undo').disabled = false;
 }
 
-function undoAction() {
+async function undoAction() {
     if (undoStack.length === 0) return;
     state = JSON.parse(undoStack.pop());
     if (undoStack.length === 0) {
@@ -138,9 +167,9 @@ function undoAction() {
     if(!state.sets.find(s => s.id === state.activeSetId) && state.sets.length > 0) {
         state.activeSetId = state.sets[0].id;
     }
-    runEngine();
-    renderTabs();
+    runEngine(); renderTabs(); 
     if(state.sets.length > 0) buildSetForm();
+    await saveData(true); // FIREWALL: Sync the undo to the cloud silently
 }
 
 // ==========================================
@@ -175,10 +204,8 @@ function startApp() {
     document.getElementById('init-modal').classList.add('opacity-0', 'pointer-events-none');
     setTimeout(() => document.getElementById('init-modal').classList.add('hidden'), 300);
     
-    runEngine();
-    renderTabs();
-    buildSetForm();
-    switchView('dashboard');
+    runEngine(); renderTabs(); buildSetForm(); switchView('dashboard');
+    saveData(true); // Push initial setup to cloud
 }
 
 function openResetModal() {
@@ -643,15 +670,33 @@ function buildSetForm() {
     calcSet(false);
 }
 
+// FIREWALL: Compress to 0.5 JPEG to prevent 1MB Firestore limit crash
+function compressImage(dataUrl, callback) {
+    const img = new Image();
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width; let h = img.height;
+        const max = 1600; // Cap resolution
+        if (w > max || h > max) {
+            if (w > h) { h = (h/w)*max; w = max; }
+            else { w = (w/h)*max; h = max; }
+        }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        callback(canvas.toDataURL('image/jpeg', 0.5));
+    };
+    img.src = dataUrl;
+}
+
 function handleImageUpload(e) {
     if(e.target.files.length > 0) {
         const reader = new FileReader();
         reader.onload = (ev) => {
-            const s = state.sets.find(w => w.id === state.activeSetId);
-            if(s) { 
-                s.image = ev.target.result; 
-                buildSetForm(); 
-            }
+            compressImage(ev.target.result, (compressed) => {
+                const s = state.sets.find(w => w.id === state.activeSetId);
+                if(s) { s.image = compressed; buildSetForm(); saveData(true); }
+            });
         };
         reader.readAsDataURL(e.target.files[0]);
     }
@@ -662,8 +707,10 @@ window.addEventListener('paste', e => {
     if(e.clipboardData.files.length > 0 && e.clipboardData.files[0].type.startsWith('image/')) { 
         const reader = new FileReader(); 
         reader.onload = (ev) => { 
-            const s = state.sets.find(w => w.id === state.activeSetId);
-            if(s) { s.image = ev.target.result; buildSetForm(); }
+            compressImage(ev.target.result, (compressed) => {
+                const s = state.sets.find(w => w.id === state.activeSetId);
+                if(s) { s.image = compressed; buildSetForm(); saveData(true); }
+            });
         }; 
         reader.readAsDataURL(e.clipboardData.files[0]); 
     }
@@ -672,7 +719,7 @@ window.addEventListener('paste', e => {
 function clearImage(e) { 
     e.stopPropagation(); 
     const s = state.sets.find(w => w.id === state.activeSetId);
-    if(s) { s.image = null; buildSetForm(); }
+    if(s) { s.image = null; buildSetForm(); saveData(true); }
 }
 
 function viewImage(src) { 
@@ -962,6 +1009,7 @@ function confirmSell() {
     runEngine();
     renderTabs();
     buildSetForm();
+    saveData(true);
     
     const btn = document.getElementById('btn-sell');
     if(btn) {
@@ -1019,15 +1067,57 @@ function loadData(event) {
     reader.readAsText(file);
 }
 
-// V1.8 Modification: Replaced file download with Firebase push
-async function saveData() { 
+// Advanced async saveData with Tactical Save UI integration
+async function saveData(silent = false) { 
     if (!currentUser) return;
+    
+    const dBtn = document.getElementById('desktop-save-btn');
+    const mBtn = document.getElementById('mob-save-btn');
+    
+    if (!silent && dBtn) {
+        dBtn.innerText = "Syncing...";
+        dBtn.classList.add('bg-slate-500'); dBtn.classList.remove('bg-brand');
+    }
+    
     try {
         await setDoc(doc(db, 'users', currentUser.uid), { strikePlannerState: state }, { merge: true });
-        console.log("State silently pushed to Firestore.");
+        
+        if (!silent && dBtn) {
+            dBtn.innerText = "Saved! ✓";
+            dBtn.classList.remove('bg-slate-500'); dBtn.classList.add('bg-brand');
+            setTimeout(() => { dBtn.innerText = "Save Profile"; }, 2000);
+        }
     } catch(e) {
         console.error("Error saving data:", e);
+        if (!silent && dBtn) {
+            dBtn.innerText = "Error!";
+            dBtn.classList.add('bg-red-500'); dBtn.classList.remove('bg-slate-500');
+            setTimeout(() => { 
+                dBtn.innerText = "Save Profile"; 
+                dBtn.classList.remove('bg-red-500'); dBtn.classList.add('bg-brand');
+            }, 2000);
+        }
     }
+}
+
+async function saveAndExit() {
+    const screen = document.getElementById('loading-screen');
+    const bar = document.getElementById('loading-progress');
+    const text = screen.querySelector('span');
+    
+    if (screen) {
+        screen.classList.remove('hidden');
+        // Force reflow
+        void screen.offsetWidth;
+        screen.classList.remove('opacity-0');
+    }
+    if (text) text.innerText = "Syncing to Cloud...";
+    if (bar) bar.style.width = '95%';
+    
+    await saveData(true);
+    
+    if (bar) bar.style.width = '100%';
+    setTimeout(() => { window.location.href = '../index.html'; }, 300);
 }
 
 // Expose all necessary functions to the global window object for HTML inline handlers
@@ -1055,3 +1145,4 @@ window.openSellModal = openSellModal;
 window.buildSetForm = buildSetForm;
 window.renderTabs = renderTabs;
 window.runEngine = runEngine;
+window.saveAndExit = saveAndExit;
