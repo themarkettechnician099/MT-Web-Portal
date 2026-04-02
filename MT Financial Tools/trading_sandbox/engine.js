@@ -346,8 +346,11 @@ function executeNuclearReset() {
     state.ledger = [{ id: Date.now(), date: new Date().toISOString(), type: 'DEPOSIT', amount: rawCap, remarks: 'Initial Funding' }];
     state.activeHoldings = []; 
     state.journal = []; 
-    state.watchlist = []; 
-    state.activeWlId = null;
+    
+    // PATCH 3: The True "Start Fresh" - Completely obliterate the watchlist
+    state.watchlist = [createEmptyWl(Date.now())]; 
+    state.activeWlId = state.watchlist[0].id;
+    
     healState();
     
     hideResetModal();
@@ -368,8 +371,11 @@ function confirmReset() {
     state.ledger = [{ id: Date.now(), date: new Date().toISOString(), type: 'DEPOSIT', amount: rawCap, remarks: 'Initial Funding' }];
     state.activeHoldings = []; 
     state.journal = []; 
-    state.watchlist = []; 
-    state.activeWlId = null;
+    
+    // PATCH 3: The True "Start Fresh"
+    state.watchlist = [createEmptyWl(Date.now())]; 
+    state.activeWlId = state.watchlist[0].id;
+    
     healState();
     exploreSandbox();
 }
@@ -960,6 +966,10 @@ function changeTrancheType(type, clear = true) {
     if (clear) wl.entries = [0, 0, 0];
     
     const cont = document.getElementById('tranche-inputs'); 
+    
+    // PATCH 1: UI Airbag - Gracefully skip if HTML isn't loaded yet
+    if (!cont) return;
+
     cont.innerHTML = ''; 
     let cfgs = [];
     
@@ -992,6 +1002,10 @@ function changeStopType(type, clear = true) {
     if (clear) wl.stopEntries = [0, 0];
     
     const cont = document.getElementById('stop-inputs'); 
+    
+    // PATCH 1: UI Airbag
+    if (!cont) return;
+
     cont.innerHTML = ''; 
     let cfgs = [];
     
@@ -1023,6 +1037,10 @@ function changeTargetType(type, clear = true) {
     if (clear) wl.targetEntries = [0, 0];
     
     const cont = document.getElementById('target-inputs'); 
+    
+    // PATCH 1: UI Airbag
+    if (!cont) return;
+
     cont.innerHTML = ''; 
     let cfgs = [];
     
@@ -1056,7 +1074,10 @@ function calcPlanner() {
     document.getElementById('w-maxpos-peso').innerText = `Limit: ${fmtPHP(capBudget)}`;
 
     let aep = 0, valid = true; 
-    const [e1, e2, e3] = wl.entries;
+    
+    // PATCH 2: The Math Guards - Safely default to an array of zeroes if corrupted
+    const [e1, e2, e3] = wl.entries || [0, 0, 0];
+    
     if (wl.trancheType === '100') { 
         if (!e1) valid = false; else aep = e1; 
     } else if (wl.trancheType === '50-50') { 
@@ -1072,7 +1093,10 @@ function calcPlanner() {
     document.getElementById('w-boardlot').innerText = bl.toLocaleString();
 
     let computedStop = 0;
-    const [s1, s2] = wl.stopEntries;
+    
+    // PATCH 2: Math Guards
+    const [s1, s2] = wl.stopEntries || [0, 0];
+    
     if (wl.stopType === '100' && s1) computedStop = s1;
     else if (wl.stopType === '50-50' && s1 && s2) computedStop = (s1*0.5) + (s2*0.5);
     wl.computedStop = computedStop;
@@ -1080,7 +1104,10 @@ function calcPlanner() {
     document.getElementById('w-blended-stop').innerText = wl.computedStop ? `₱${wl.computedStop.toFixed(4)}` : "₱0.00";
 
     let computedTarget = 0;
-    const [t1, t2] = wl.targetEntries;
+    
+    // PATCH 2: Math Guards
+    const [t1, t2] = wl.targetEntries || [0, 0];
+    
     if (wl.targetType === '100' && t1) computedTarget = t1;
     else if (wl.targetType === '50-50' && t1 && t2) computedTarget = (t1*0.5) + (t2*0.5);
     wl.computedTarget = computedTarget;
