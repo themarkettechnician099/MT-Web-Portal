@@ -634,7 +634,16 @@
                                     </div>
                                 </div>
 
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4">
+                                <button onclick="document.getElementById('trade-summary-box').classList.toggle('hidden')" class="w-full lg:hidden py-2 mt-4 bg-slate-100 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700/50 text-brand rounded-lg text-[10px] font-bold uppercase tracking-widest transition flex justify-center items-center gap-2 border border-slate-200 dark:border-slate-700/50 active:scale-95 outline-none">
+                                    📝 View Trade Summary
+                                </button>
+
+                                <div id="trade-summary-box" class="hidden lg:block bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-lg p-3 lg:p-4 mt-4 lg:mt-4 shadow-inner text-[11px] lg:text-xs text-slate-600 dark:text-slate-400 leading-relaxed transition-all">
+                                    <p id="summary-p1" class="mb-2">Awaiting valid trade parameters to generate summary...</p>
+                                    <p id="summary-p2"></p>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4 lg:mt-0">
                                     <div class="bg-slate-100 dark:bg-slate-900/60 p-4 rounded-lg border border-slate-200 dark:border-slate-700/50 flex flex-col justify-center relative overflow-hidden" id="box-cost">
                                         <div id="ind-cost" class="absolute top-0 left-0 w-full h-0.5 bg-transparent"></div>
                                         <p class="text-[9px] text-slate-500 uppercase font-bold tracking-widest mb-1">Est. Cost</p>
