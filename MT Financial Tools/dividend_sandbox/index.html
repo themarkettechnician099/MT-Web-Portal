@@ -78,9 +78,12 @@
             <p class="text-sm text-slate-600 dark:text-slate-400 mb-8 leading-relaxed text-left">
                 This app will help you plan your dividend portfolio. Once you are done with choosing your dividend paying stocks, the next step is to plan their allocation and dividend schedules in the "Allocator Tab". You can use the "Projections" tab to simulate how much you can grow your funds and plan your monthly top-ups. The "Dividend Calendar" tab simulates when and how much you could receive every payment schedule. There's a Guidebook that will help you to reach you investing goals.
             </p>
-            <div class="flex flex-col sm:flex-row gap-4 w-full justify-center">
-                <button id="btn-welcome-load" class="flex-1 px-6 py-3 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition-colors shadow-sm">Load Saved</button>
-                <button id="btn-welcome-fresh" class="flex-1 px-6 py-3 bg-brand hover:opacity-90 text-white font-bold rounded-xl transition-colors shadow-lg">Start Fresh</button>
+            <div class="flex flex-col gap-4 w-full justify-center text-left mt-4">
+                <div class="w-full">
+                    <label class="block text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 font-bold">Initial Capital (₱)</label>
+                    <input type="text" inputmode="decimal" id="welcome-initial-cap" placeholder="e.g. 100,000" class="comma-input w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-lg font-mono focus:ring-2 focus:ring-brand focus:outline-none transition-all text-slate-900 dark:text-white">
+                </div>
+                <button id="btn-welcome-fresh" class="w-full px-6 py-3 bg-brand hover:opacity-90 text-white font-bold rounded-xl transition-colors shadow-lg">Start Sandbox</button>
             </div>
         </div>
     </div>
@@ -164,7 +167,6 @@
         </div>
         <div class="flex items-center gap-2">
             <button id="btn-undo-mob" class="hidden p-2 rounded-lg bg-green-100 dark:bg-green-600/20 text-green-700 dark:text-green-400 hover:bg-green-200 transition-colors border border-green-300 shadow-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg></button>
-            <button id="btn-load-mob" class="p-2 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></button>
             <button id="btn-save-mob" class="p-2 rounded-lg bg-brand text-white shadow-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg></button>
             <button class="theme-toggle-btn p-2 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm">
                 <svg class="w-4 h-4 hidden dark:block text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
@@ -220,12 +222,10 @@
                     <span class="text-[10px] font-bold uppercase tracking-widest">Undo Action</span>
                 </button>
                 <div class="flex gap-2">
-                    <input type="file" id="file-load" class="hidden" accept=".json">
-                    <button class="theme-toggle-btn flex-shrink-0 p-2.5 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg transition-colors flex justify-center items-center shadow-sm w-full lg:w-auto mx-auto lg:mx-0">
+                    <button class="theme-toggle-btn flex-shrink-0 p-2.5 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg transition-colors flex justify-center items-center shadow-sm w-full mx-auto lg:mx-0">
                         <svg class="w-4 h-4 hidden dark:block text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
                         <svg class="w-4 h-4 block dark:hidden text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
                     </button>
-                    <button id="btn-load-desk" class="flex-1 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors shadow-sm">Load</button>
                     <button id="btn-save-desk" class="flex-1 py-2 bg-brand text-white text-xs font-bold rounded-lg hover:opacity-90 shadow-sm">Save</button>
                 </div>
                 <button onclick="openResetModal()" class="w-full flex items-center justify-center lg:justify-start gap-3 p-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors border border-red-200 dark:border-red-800/30 shadow-sm mt-3 group">
@@ -767,7 +767,7 @@
                 <span class="text-[9px] font-bold mt-1">Sandbox</span>
             </button>
             <button onclick="switchMainView('calendar')" id="mob-nav-calendar" class="flex flex-col items-center justify-center p-2 text-slate-500 dark:text-slate-400 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z"></path></svg>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 <span class="text-[9px] font-bold mt-1">Calendar</span>
             </button>
             <button onclick="switchMainView('guidebook')" id="mob-nav-guidebook" class="flex flex-col items-center justify-center p-2 text-slate-500 dark:text-slate-400 transition-colors">
