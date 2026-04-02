@@ -36,6 +36,33 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ==========================================
+// 2.5 INDESTRUCTIBLE HEALER
+// ==========================================
+function healSandboxState(state) {
+    const enforceArray = (data, defaultFactory = null) => {
+        if (!data) return defaultFactory ? Array.from({ length: 3 }, defaultFactory) : [];
+        if (Array.isArray(data)) return data.filter(item => item !== null && item !== undefined);
+        if (typeof data === 'object') return Object.values(data).filter(item => item !== null && item !== undefined);
+        return defaultFactory ? Array.from({ length: 3 }, defaultFactory) : [];
+    };
+
+    const defaultTrade = () => ({ ticker: '', sector: 'Property', dps: 0, schedule: [], curShares: 0, curCost: 0, mktPrice: 0, action: 'HOLD', actShares: 0, actPrice: 0 });
+
+    AppState.brokerCash = state.brokerCash || 0;
+    AppState.isDrip = state.isDrip !== undefined ? state.isDrip : true;
+    
+    // Heal sparse arrays and apply fallbacks
+    let healedTrades = enforceArray(state.trades);
+    if (healedTrades.length === 0) healedTrades = Array.from({ length: 3 }, defaultTrade);
+    
+    AppState.trades = healedTrades;
+    AppState.tradeLog = enforceArray(state.tradeLog);
+    AppState.fundingLog = enforceArray(state.fundingLog);
+    
+    AppState.undoStack = [];
+}
+
+// ==========================================
 // 3. CLOUD DATA HANDLING
 // ==========================================
 async function loadCloudProfile() {
@@ -43,42 +70,43 @@ async function loadCloudProfile() {
         const docRef = doc(db, "users", currentUser.uid);
         const docSnap = await getDoc(docRef);
         
+        let isReturningUser = false;
+
         if (docSnap.exists()) {
             const cloudData = docSnap.data();
             
-            // Check if this specific app has saved data in the user's master document
+            // Check if this specific app has saved data
             if (cloudData && cloudData[DB_KEY]) {
-                const state = cloudData[DB_KEY];
+                healSandboxState(cloudData[DB_KEY]);
                 
-                // Inject cloud data into the AppState safely
-                if (state.brokerCash !== undefined && state.trades) {
-                    AppState.brokerCash = state.brokerCash; 
-                    AppState.trades = state.trades;
-                    if(state.tradeLog) AppState.tradeLog = state.tradeLog;
-                    if(state.fundingLog) AppState.fundingLog = state.fundingLog;
-                    if(state.isDrip !== undefined) AppState.isDrip = state.isDrip;
-
-                    // Reset undo stack since we just loaded a fresh profile
-                    AppState.undoStack = [];
-                    document.getElementById('btn-undo-desk').classList.add('hidden'); 
-                    document.getElementById('btn-undo-desk').classList.remove('flex');
-                    document.getElementById('btn-undo-mob').classList.add('hidden'); 
-                    document.getElementById('btn-undo-mob').classList.remove('flex');
-                    
-                    // Render the UI with loaded data
-                    renderTabs(); 
-                    switchTab(0); 
-                    window.switchMainView('dashboard'); 
-                    masterSync();
+                // If they have funding history or existing cash, they are an active user
+                if (AppState.fundingLog.length > 0 || AppState.brokerCash > 0) {
+                    isReturningUser = true;
                 }
             }
         }
         
-        // Hide the welcome modal smoothly once profile is loaded (or if fresh start)
-        const modal = document.getElementById('welcome-modal');
-        if(modal && !modal.classList.contains('hidden')) {
-            modal.classList.add('opacity-0');
-            setTimeout(() => modal.classList.add('hidden'), 300);
+        if (isReturningUser) {
+            document.getElementById('btn-undo-desk').classList.add('hidden'); 
+            document.getElementById('btn-undo-desk').classList.remove('flex');
+            document.getElementById('btn-undo-mob').classList.add('hidden'); 
+            document.getElementById('btn-undo-mob').classList.remove('flex');
+            
+            // Render the UI with loaded data
+            renderTabs(); 
+            switchTab(0); 
+            window.switchMainView('dashboard'); 
+            masterSync();
+
+            // Hide the welcome modal smoothly
+            const modal = document.getElementById('welcome-modal');
+            if(modal && !modal.classList.contains('hidden')) {
+                modal.classList.add('opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            }
+        } else {
+            // New User: Leave the modal open and active for Initial Capital input
+            console.log("No active ledger found. Awaiting Initial Funding.");
         }
 
     } catch (error) {
@@ -1083,3 +1111,35 @@ const handleManualSave = () => {
 };
 document.getElementById('btn-save-desk')?.addEventListener('click', handleManualSave);
 document.getElementById('btn-save-mob')?.addEventListener('click', handleManualSave);
+
+// ==========================================
+// NEW: IGNITION SWITCH (WELCOME MODAL)
+// ==========================================
+document.getElementById('btn-welcome-fresh')?.addEventListener('click', () => {
+    const rawAmt = Utils.parseNum(document.getElementById('welcome-initial-cap').value);
+    
+    Utils.executeWithLoader(() => {
+        // Seed initial capital if the user provided an amount
+        if (rawAmt > 0) {
+            AppState.brokerCash = rawAmt;
+            AppState.fundingLog.unshift({ 
+                id: Date.now(), 
+                date: new Date().toLocaleDateString('en-US'), 
+                amount: rawAmt,
+                type: 'Initial Capital', 
+                remarks: 'Starting Sandbox Capital' 
+            });
+        }
+
+        // Hide the welcome modal smoothly
+        const modal = document.getElementById('welcome-modal');
+        modal.classList.add('opacity-0');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+
+        // Initialize UI, trigger engine, and auto-save to cloud
+        renderTabs(); 
+        switchTab(0); 
+        window.switchMainView('dashboard'); 
+        masterSync();
+    });
+});
