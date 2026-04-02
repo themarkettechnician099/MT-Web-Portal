@@ -23,6 +23,15 @@ const DB_KEY = "dividendSandboxState";
 let currentUser = null;
 
 // ==========================================
+// 1.5 PSYCHOLOGICAL LOADER INIT
+// ==========================================
+// Kick off the loading bar immediately to 92%
+setTimeout(() => {
+    const bar = document.getElementById('loading-progress');
+    if (bar) bar.style.width = '92%';
+}, 50);
+
+// ==========================================
 // 2. AUTH STATE OBSERVER (THE GATEKEEPER)
 // ==========================================
 onAuthStateChanged(auth, (user) => {
@@ -98,19 +107,36 @@ async function loadCloudProfile() {
             window.switchMainView('dashboard'); 
             masterSync();
 
-            // Hide the welcome modal smoothly
+            // Ensure modal is hidden
             const modal = document.getElementById('welcome-modal');
             if(modal && !modal.classList.contains('hidden')) {
-                modal.classList.add('opacity-0');
-                setTimeout(() => modal.classList.add('hidden'), 300);
+                modal.classList.add('hidden');
             }
         } else {
             // New User: Leave the modal open and active for Initial Capital input
             console.log("No active ledger found. Awaiting Initial Funding.");
+            const modal = document.getElementById('welcome-modal');
+            if(modal) {
+                modal.classList.remove('hidden', 'pointer-events-none');
+                setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            }
         }
 
     } catch (error) {
         console.error("Error loading cloud profile:", error);
+    } finally {
+        // Resolve Psychological Loading Screen
+        const loadBar = document.getElementById('loading-progress');
+        const loadScreen = document.getElementById('loading-screen');
+        
+        if (loadBar) loadBar.style.width = '100%';
+        
+        setTimeout(() => {
+            if (loadScreen) {
+                loadScreen.classList.add('opacity-0');
+                setTimeout(() => loadScreen.classList.add('hidden'), 300);
+            }
+        }, 500);
     }
 }
 
@@ -1064,8 +1090,8 @@ window.executeUndo = function() { if (AppState.undoStack.length === 0) return; c
 document.getElementById('btn-undo-desk')?.addEventListener('click', window.executeUndo); document.getElementById('btn-undo-mob')?.addEventListener('click', window.executeUndo);
 
 let targetResetCode = '000';
-window.openResetModal = function() { targetResetCode = Math.floor(100 + Math.random() * 900).toString(); document.getElementById('reset-rand-code').innerText = targetResetCode; document.getElementById('reset-input').value = ''; document.getElementById('btn-reset-confirm').disabled = true; document.getElementById('btn-reset-confirm').className = "w-full py-3 bg-red-600 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg cursor-not-allowed opacity-30 transition-all"; document.getElementById('reset-modal').classList.remove('hidden'); setTimeout(() => document.getElementById('reset-modal').classList.remove('opacity-0'), 10); };
-document.getElementById('reset-input')?.addEventListener('input', (e) => { if (e.target.value === targetResetCode) { document.getElementById('btn-reset-confirm').disabled = false; document.getElementById('btn-reset-confirm').className = "w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg transition-all active:scale-95"; } else { document.getElementById('btn-reset-confirm').disabled = true; document.getElementById('btn-reset-confirm').className = "w-full py-3 bg-red-600 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg cursor-not-allowed opacity-30 transition-all"; } });
+window.openResetModal = function() { targetResetCode = Math.floor(100 + Math.random() * 900).toString(); document.getElementById('reset-rand-code').innerText = targetResetCode; document.getElementById('reset-input').value = ''; document.getElementById('btn-reset-confirm').disabled = true; document.getElementById('btn-reset-confirm').className = "w-full py-3 bg-red-600 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg cursor-not-allowed opacity-30 transition-all active:scale-95"; document.getElementById('reset-modal').classList.remove('hidden'); setTimeout(() => document.getElementById('reset-modal').classList.remove('opacity-0'), 10); };
+document.getElementById('reset-input')?.addEventListener('input', (e) => { if (e.target.value === targetResetCode) { document.getElementById('btn-reset-confirm').disabled = false; document.getElementById('btn-reset-confirm').className = "w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg transition-all active:scale-95"; } else { document.getElementById('btn-reset-confirm').disabled = true; document.getElementById('btn-reset-confirm').className = "w-full py-3 bg-red-600 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg cursor-not-allowed opacity-30 transition-all active:scale-95"; } });
 document.getElementById('btn-reset-cancel')?.addEventListener('click', () => { document.getElementById('reset-modal').classList.add('opacity-0'); setTimeout(() => document.getElementById('reset-modal').classList.add('hidden'), 300); });
 document.getElementById('btn-reset-confirm')?.addEventListener('click', () => { AppState.undoStack = []; document.getElementById('btn-undo-desk').classList.add('hidden'); document.getElementById('btn-undo-desk').classList.remove('flex'); document.getElementById('btn-undo-mob').classList.add('hidden'); document.getElementById('btn-undo-mob').classList.remove('flex'); AppState.brokerCash = 0; AppState.tradeLog = []; AppState.fundingLog = []; AppState.trades = Array.from({ length: 3 }, () => ({ ticker: '', sector: 'Property', dps: 0, schedule: [], curShares: 0, curCost: 0, mktPrice: 0, action: 'HOLD', actShares: 0, actPrice: 0 })); document.getElementById('btn-reset-cancel').click(); renderTabs(); switchTab(0); masterSync(); });
 
@@ -1093,27 +1119,63 @@ document.querySelectorAll('.comma-input').forEach(input => {
     });
 });
 
-// Repurpose manual save buttons to trigger cloud save + visual feedback
-const handleManualSave = () => {
-    Utils.executeWithLoader(async () => {
-        await saveData();
-        const actFlow = document.getElementById('out-act-flow');
-        if(actFlow) {
-            const originalText = actFlow.innerText;
-            actFlow.innerText = "SAVED TO CLOUD ✅";
-            actFlow.classList.add("text-brand");
+// ==========================================
+// NEW: SAVE & EXIT GLOBAL FUNCTION
+// ==========================================
+window.saveAndExit = async function() {
+    const loadScreen = document.getElementById('loading-screen');
+    const loadBar = document.getElementById('loading-progress');
+    
+    // Resurrect loading screen
+    if (loadScreen) {
+        loadScreen.classList.remove('hidden', 'opacity-0');
+        if (loadBar) {
+            loadBar.style.transition = 'none';
+            loadBar.style.width = '0%';
             setTimeout(() => {
-                actFlow.classList.remove("text-brand");
-                if(actFlow.innerText === "SAVED TO CLOUD ✅") actFlow.innerText = originalText;
-            }, 2000);
+                loadBar.style.transition = 'all 1000ms ease-out';
+                loadBar.style.width = '70%';
+            }, 50);
         }
-    });
+    }
+
+    await saveData();
+
+    if (loadBar) loadBar.style.width = '100%';
+    setTimeout(() => {
+        window.location.href = '../index.html';
+    }, 400);
+};
+
+// ==========================================
+// UPGRADED: TACTILE MANUAL SAVE
+// ==========================================
+const handleManualSave = async (e) => {
+    const btn = e.currentTarget;
+    const originalHTML = btn.innerHTML;
+    const isDesktop = btn.id === 'btn-save-desk';
+
+    // Change to Syncing state
+    btn.innerHTML = isDesktop ? "Syncing..." : `<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>`;
+    btn.classList.add('opacity-75', 'cursor-not-allowed');
+    btn.disabled = true;
+
+    await saveData();
+
+    // Change to Saved state
+    btn.innerHTML = isDesktop ? "Saved! ✓" : `<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+    btn.classList.remove('opacity-75', 'cursor-not-allowed');
+    
+    setTimeout(() => {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }, 2000);
 };
 document.getElementById('btn-save-desk')?.addEventListener('click', handleManualSave);
 document.getElementById('btn-save-mob')?.addEventListener('click', handleManualSave);
 
 // ==========================================
-// NEW: IGNITION SWITCH (WELCOME MODAL)
+// IGNITION SWITCH (WELCOME MODAL)
 // ==========================================
 document.getElementById('btn-welcome-fresh')?.addEventListener('click', () => {
     const rawAmt = Utils.parseNum(document.getElementById('welcome-initial-cap').value);
