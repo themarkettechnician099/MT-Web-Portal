@@ -30,6 +30,7 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
+// V2.14 Defensive Architecture: Actively heals missing or corrupted arrays from old save files
 function healState() {
     if (!state.strategies || state.strategies.length === 0) {
         state.strategies = ['Breakout', 'Bounce Play', 'Swing'];
@@ -174,15 +175,7 @@ function undo() {
     }
     
     runEngine(); 
-    populateStrategyDropdowns(); 
-    renderWlTabs();
-    
-    if(state.watchlist.findIndex(w => w.id === state.activeWlId) === -1 && state.watchlist.length > 0) {
-        state.activeWlId = state.watchlist[0].id;
-    }
-    if(state.watchlist.length > 0) {
-        loadWlTab(state.activeWlId);
-    }
+    initPlanner(); 
     
     const activeNav = document.querySelector('.nav-item.active').id.replace('nav-', '');
     switchView(activeNav);
@@ -698,7 +691,6 @@ function renderDashboardCharts() {
 // ==========================================
 // 7. ACTIVE HOLDINGS GALLERY
 // ==========================================
-// V2.14 Fix: Dynamic "Add Chart" upload button for active holdings missing an image
 function renderHoldingsGallery(masterCapital) {
     const container = document.getElementById('holdings-gallery'); 
     if(!container) return;
@@ -769,7 +761,6 @@ function renderHoldingsGallery(masterCapital) {
     });
 }
 
-// V2.14 Helper: Processes the file input from the Gallery card
 function handleGalleryUpload(e, id) {
     if(e.target.files.length > 0) {
         const reader = new FileReader();
@@ -778,7 +769,7 @@ function handleGalleryUpload(e, id) {
             if (pos) {
                 pos.image = ev.target.result;
                 saveState();
-                runEngine(false); // Update gallery with the new image
+                runEngine(false); 
             }
         };
         reader.readAsDataURL(e.target.files[0]);
@@ -852,10 +843,15 @@ function populateStrategyDropdowns() {
 
 function initPlanner() {
     populateStrategyDropdowns();
-    if (state.watchlist.length === 0) { 
-        state.watchlist.push(createEmptyWl(Date.now())); 
+    
+    // V2.14 Defensive Architecture: Prevents loadWlTab from ever crashing on an undefined or out-of-sync activeWlId
+    if (!state.watchlist || state.watchlist.length === 0) { 
+        state.watchlist = [createEmptyWl(Date.now())]; 
         state.activeWlId = state.watchlist[0].id; 
+    } else if (!state.watchlist.find(w => w.id === state.activeWlId)) {
+        state.activeWlId = state.watchlist[0].id;
     }
+    
     renderWlTabs(); 
     loadWlTab(state.activeWlId);
 }
@@ -888,7 +884,17 @@ function renderWlTabs() {
 
 function loadWlTab(id) {
     state.activeWlId = id; 
-    const wl = state.watchlist.find(w => w.id === id);
+    
+    // V2.14 Defensive Architecture: Fail-safe to ensure wl is never undefined
+    let wl = state.watchlist.find(w => w.id === id);
+    if (!wl) {
+        if (state.watchlist.length > 0) {
+            wl = state.watchlist[0];
+            state.activeWlId = wl.id;
+        } else {
+            return; 
+        }
+    }
     
     document.getElementById('w-ticker').value = wl.ticker; 
     document.getElementById('w-sector').value = wl.sector || 'Others';
@@ -1813,7 +1819,6 @@ function deleteStrategy(idx) {
     
     if(isUsed) return alert("Cannot delete a strategy while it is being used in an Open Trade."); 
     
-    // V2.14 Fix: Explicit Confirmation Guardrail
     if(!confirm(`Are you sure you want to permanently delete the "${stratName}" strategy?`)) return;
 
     saveState(); 
