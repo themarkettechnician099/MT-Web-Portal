@@ -29,7 +29,7 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// V2.14 OVERHAUL: Aggressive Schema Validation
+// V2.14 Defensive Architecture: Actively heals missing or corrupted arrays
 function healState() {
     if (!state.strategies || state.strategies.length === 0) {
         state.strategies = ['Breakout', 'Bounce Play', 'Swing'];
@@ -40,11 +40,9 @@ function healState() {
     if (!state.ledger) state.ledger = [];
 
     state.watchlist.forEach(wl => {
-        // AGGRESSIVE HEAL: If the string is corrupted or missing, force it to '100' so the UI doesn't crash
-        if (!['100', '50-50', '50-30-20'].includes(wl.trancheType)) wl.trancheType = '100';
-        if (!['100', '50-50'].includes(wl.stopType)) wl.stopType = '100';
-        if (!['100', '50-50'].includes(wl.targetType)) wl.targetType = '100';
-        
+        if (!wl.trancheType) wl.trancheType = '100';
+        if (!wl.stopType) wl.stopType = '100';
+        if (!wl.targetType) wl.targetType = '100';
         if (!wl.entries) wl.entries = [0, 0, 0];
         if (!wl.stopEntries) wl.stopEntries = [0, 0];
         if (!wl.targetEntries) wl.targetEntries = [0, 0];
@@ -55,13 +53,14 @@ function healState() {
     });
     
     state.activeHoldings.forEach(pos => {
-        if (!['100', '50-50'].includes(pos.targetType)) pos.targetType = '100';
-        if (!['100', '50-50'].includes(pos.stopType)) pos.stopType = '100';
+        if (!pos.targetType) pos.targetType = '100';
+        if (!pos.stopType) pos.stopType = '100';
         if (!pos.targetEntries) pos.targetEntries = [0, 0];
         if (!pos.stopEntries) pos.stopEntries = [0, 0];
     });
 }
 
+// THE OVERHAUL: Strict Binary Load
 async function loadCloudProfile() {
     try {
         const docRef = doc(db, 'users', currentUser.uid);
@@ -70,19 +69,21 @@ async function loadCloudProfile() {
         if (docSnap.exists()) {
             const data = docSnap.data();
             
-            // LEGACY RESCUE: Look for the new state, but fallback to the old states to rescue your real data
+            // Legacy rescue included
             const cloudState = data.tradingSandboxState || data.appNameState || data.state;
             
             if (cloudState) {
                 state = cloudState;
                 healState();
                 
+                // If they have a ledger, let them in.
                 if (state.ledger && state.ledger.length > 0) {
                     document.getElementById('init-modal').classList.add('hidden');
                     runEngine();
                     initPlanner();
                     switchView('dashboard');
                 } else {
+                    // If ledger is empty, force Capital Input screen
                     console.log("Empty ledger. Forcing Welcome Screen.");
                     document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
                 }
@@ -148,26 +149,14 @@ function limitPosSize(input) {
 // ==========================================
 // 2. MASTER STATE MANAGEMENT
 // ==========================================
+// THE OVERHAUL: Completely Empty Default State
 let state = {
-    ledger: [
-        { id: 1, date: new Date().toISOString(), type: 'DEPOSIT', amount: 200000, remarks: 'Initial Funding' }
-    ],
+    ledger: [],
     strategies: ['Breakout', 'Bounce Play', 'Swing'],
     activeHoldings: [], 
     watchlist: [], 
     activeWlId: null,
-    journal: [
-        { id: 201, date: '2023-10-01', ticker: 'ALI', strat: 'Breakout', sector: 'Property', entry: 25.00, exit: 27.00, shares: 1600, cost: 40000, netPnl: 3200.00, posSizePct: 0.20 },
-        { id: 202, date: '2023-10-05', ticker: 'DITO', strat: 'Bounce Play', sector: 'Telco', entry: 5.00, exit: 4.75, shares: 8000, cost: 40000, netPnl: -2000.00, posSizePct: 0.20 },
-        { id: 203, date: '2023-10-10', ticker: 'BDO', strat: 'Swing', sector: 'Financial', entry: 125.00, exit: 135.93, shares: 320, cost: 40000, netPnl: 3500.00, posSizePct: 0.20 },
-        { id: 204, date: '2023-10-15', ticker: 'ICT', strat: 'Breakout', sector: 'Others', entry: 250.00, exit: 237.50, shares: 160, cost: 40000, netPnl: -2000.00, posSizePct: 0.20 },
-        { id: 205, date: '2023-10-20', ticker: 'AC', strat: 'Bounce Play', sector: 'Holdings', entry: 500.00, exit: 476.25, shares: 80, cost: 40000, netPnl: -1900.00, posSizePct: 0.20 },
-        { id: 206, date: '2023-10-25', ticker: 'SMPH', strat: 'Swing', sector: 'Property', entry: 25.00, exit: 23.75, shares: 1600, cost: 40000, netPnl: -2000.00, posSizePct: 0.20 },
-        { id: 207, date: '2023-10-28', ticker: 'JFC', strat: 'Breakout', sector: 'Consumer', entry: 250.00, exit: 268.12, shares: 160, cost: 40000, netPnl: 2900.00, posSizePct: 0.20 },
-        { id: 208, date: '2023-11-02', ticker: 'MONDE', strat: 'Bounce Play', sector: 'Consumer', entry: 8.33, exit: 7.91, shares: 4801, cost: 40000, netPnl: -2100.00, posSizePct: 0.20 },
-        { id: 209, date: '2023-11-05', ticker: 'URC', strat: 'Swing', sector: 'Consumer', entry: 100.00, exit: 108.00, shares: 400, cost: 40000, netPnl: 3200.00, posSizePct: 0.20 },
-        { id: 210, date: '2023-11-10', ticker: 'CNVRG', strat: 'Bounce Play', sector: 'Telco', entry: 8.33, exit: 7.91, shares: 4801, cost: 40000, netPnl: -2000.00, posSizePct: 0.20 }
-    ]
+    journal: []
 };
 
 let globalActualStats = { wr: 0.40, avgGainPct: 0.08, avgLossPct: -0.05, posSizePct: 0.20 };
@@ -244,49 +233,6 @@ function switchView(view) {
     }, 50);
 }
 
-function exploreSandbox() {
-    document.getElementById('init-modal').classList.add('opacity-0', 'pointer-events-none');
-    setTimeout(() => document.getElementById('init-modal').classList.add('hidden'), 300);
-    
-    if (state.activeHoldings.length === 0 && state.journal.length > 0) {
-        state.activeHoldings.push(
-            { id: 901, ticker: 'ALI', sector: 'Property', strategy: 'Breakout', shares: 1200, avgCost: 33.33, currentPrice: 34.10, image: null, targetType: '100', stopType: '100', targetEntries: [38.50, 0], stopEntries: [31.50, 0] },
-            { id: 902, ticker: 'JFC', sector: 'Consumer', strategy: 'Bounce Play', shares: 165, avgCost: 242.00, currentPrice: 240.50, image: null, targetType: '50-50', stopType: '100', targetEntries: [255.00, 270.00], stopEntries: [230.00, 0] },
-            { id: 903, ticker: 'BDO', sector: 'Financial', strategy: 'Swing', shares: 275, avgCost: 145.45, currentPrice: 141.20, image: null, targetType: '100', stopType: '50-50', targetEntries: [160.00, 0], stopEntries: [138.00, 135.00] }
-        );
-    }
-    
-    runEngine(); 
-    initPlanner(); 
-    switchView('dashboard');
-}
-
-function showStartFresh() { 
-    document.getElementById('welcome-btns').classList.add('hidden'); 
-    document.getElementById('fresh-start-div').classList.remove('hidden'); 
-}
-
-function hideStartFresh() { 
-    document.getElementById('fresh-start-div').classList.add('hidden'); 
-    document.getElementById('welcome-btns').classList.remove('hidden'); 
-}
-
-function loadData(event) {
-    const file = event.target.files[0]; 
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) { 
-        try { 
-            state = JSON.parse(e.target.result);
-            healState(); 
-            exploreSandbox(); 
-        } catch(err) { 
-            alert("Invalid save file."); 
-        } 
-    };
-    reader.readAsText(file);
-}
-
 function getStratColor(strat) { 
     const idx = state.strategies.indexOf(strat); 
     return idx > -1 ? themeHexColors[idx % themeHexColors.length] : '#94a3b8'; 
@@ -299,7 +245,7 @@ function getSectorColor(sector) {
 }
 
 // ==========================================
-// 4. NUCLEAR ALERT
+// 4. NUCLEAR ALERT & INITIALIZATION
 // ==========================================
 let currentSecurityCode = "";
 
@@ -339,43 +285,54 @@ function checkResetCode(val) {
     }
 }
 
-function executeNuclearReset() {
-    const rawCap = getRawValue(document.getElementById('init-capital').value) || 200000;
+// THE OVERHAUL: Hard Wipe and Browser Refresh
+async function executeNuclearReset() {
+    state = {
+        ledger: [],
+        strategies: ['Breakout', 'Bounce Play', 'Swing'],
+        activeHoldings: [], 
+        watchlist: [], 
+        activeWlId: null,
+        journal: []
+    };
     
-    saveState(); 
-    state.ledger = [{ id: Date.now(), date: new Date().toISOString(), type: 'DEPOSIT', amount: rawCap, remarks: 'Initial Funding' }];
-    state.activeHoldings = []; 
-    state.journal = []; 
+    if (currentUser) {
+        try {
+            await setDoc(doc(db, 'users', currentUser.uid), { tradingSandboxState: state }, { merge: true });
+        } catch(e) {
+            console.error("Error wiping cloud data:", e);
+        }
+    }
     
-    state.watchlist = [createEmptyWl(Date.now())]; 
-    state.activeWlId = state.watchlist[0].id;
-    
-    healState();
-    
-    hideResetModal();
-    showStartFresh(); 
-    document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
-    
-    if (distChart) distChart.destroy();
-    if (stratChart) stratChart.destroy();
-    
-    runEngine(); 
+    window.location.reload();
 }
 
+// THE OVERHAUL: Initial Capital Setup and Auto-Save
 function confirmReset() {
     const rawCap = getRawValue(document.getElementById('init-capital').value);
     if(rawCap <= 0) return alert('Enter a valid starting capital amount.');
     
-    saveState(); 
-    state.ledger = [{ id: Date.now(), date: new Date().toISOString(), type: 'DEPOSIT', amount: rawCap, remarks: 'Initial Funding' }];
-    state.activeHoldings = []; 
-    state.journal = []; 
+    state = {
+        ledger: [{ id: Date.now(), date: new Date().toISOString(), type: 'DEPOSIT', amount: rawCap, remarks: 'Initial Funding' }],
+        strategies: ['Breakout', 'Bounce Play', 'Swing'],
+        activeHoldings: [], 
+        watchlist: [], 
+        activeWlId: null,
+        journal: []
+    };
     
     state.watchlist = [createEmptyWl(Date.now())]; 
     state.activeWlId = state.watchlist[0].id;
     
     healState();
-    exploreSandbox();
+    
+    document.getElementById('init-modal').classList.add('opacity-0', 'pointer-events-none');
+    setTimeout(() => document.getElementById('init-modal').classList.add('hidden'), 300);
+    
+    runEngine(); 
+    initPlanner(); 
+    switchView('dashboard');
+    saveData(); // Auto-save initial capital to cloud
 }
 
 // ==========================================
@@ -513,13 +470,16 @@ function updateDials() {
 
     const setGauge = (id, pct) => {
         const path = document.getElementById(id);
+        if(!path) return;
         const val = Math.min(100, Math.max(0, Math.abs(pct) * 5));
         path.setAttribute('stroke-dasharray', `${val}, 100`);
     };
     
     setGauge('gauge-ag-path', ag); 
     setGauge('gauge-al-path', Math.abs(al));
-    document.getElementById('gauge-wr-path').setAttribute('stroke-dasharray', `${Math.min(100, Math.max(0, wr))}, 100`);
+    if(document.getElementById('gauge-wr-path')) {
+        document.getElementById('gauge-wr-path').setAttribute('stroke-dasharray', `${Math.min(100, Math.max(0, wr))}, 100`);
+    }
 }
 
 function calculateDistributionData() {
@@ -657,56 +617,60 @@ function renderDashboardCharts() {
     });
 
     const secLabels = []; const secData = []; const secColors = [];
-    document.getElementById('sector-legend').innerHTML = '';
-    Object.keys(sectorMap).forEach(s => {
-        if(sectorMap[s] > 0) {
-            secLabels.push(s); secData.push(sectorMap[s]);
-            const col = getSectorColor(s); secColors.push(col);
-            const pct = (sectorMap[s] / totalActiveValue) * 100;
-            document.getElementById('sector-legend').innerHTML += `
-                <div class="flex justify-between items-center text-xs font-mono w-full">
-                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full" style="background-color: ${col}"></div><span class="text-slate-700 dark:text-slate-300 font-bold">${s}</span></div>
-                    <span class="text-slate-500">${pct.toFixed(1)}%</span>
-                </div>`;
-        }
-    });
+    if(document.getElementById('sector-legend')) {
+        document.getElementById('sector-legend').innerHTML = '';
+        Object.keys(sectorMap).forEach(s => {
+            if(sectorMap[s] > 0) {
+                secLabels.push(s); secData.push(sectorMap[s]);
+                const col = getSectorColor(s); secColors.push(col);
+                const pct = (sectorMap[s] / totalActiveValue) * 100;
+                document.getElementById('sector-legend').innerHTML += `
+                    <div class="flex justify-between items-center text-xs font-mono w-full">
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full" style="background-color: ${col}"></div><span class="text-slate-700 dark:text-slate-300 font-bold">${s}</span></div>
+                        <span class="text-slate-500">${pct.toFixed(1)}%</span>
+                    </div>`;
+            }
+        });
+    }
 
     const ctxSector = document.getElementById('sectorChart');
     if(ctxSector && sectorDoughnut) sectorDoughnut.destroy();
-    if(secData.length > 0) {
+    if(secData.length > 0 && ctxSector) {
         sectorDoughnut = new Chart(ctxSector.getContext('2d'), {
             type: 'doughnut',
             data: { labels: secLabels, datasets: [{ data: secData, backgroundColor: secColors, borderWidth: 0, hoverOffset: 4 }] },
             options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ` ₱${ctx.raw.toLocaleString()}` } } } }
         });
-    } else {
+    } else if (document.getElementById('sector-legend')) {
         document.getElementById('sector-legend').innerHTML = '<span class="text-xs text-slate-500">No active capital.</span>';
     }
 
     const stratLabels = []; const stratData = []; const stratColors = [];
-    document.getElementById('strategy-legend').innerHTML = '';
-    Object.keys(strategyMap).forEach(s => {
-        if(strategyMap[s] > 0) {
-            stratLabels.push(s); stratData.push(strategyMap[s]);
-            const col = getStratColor(s); stratColors.push(col);
-            const pct = (strategyMap[s] / totalActiveValue) * 100;
-            document.getElementById('strategy-legend').innerHTML += `
-                <div class="flex justify-between items-center text-xs font-mono w-full">
-                    <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full" style="background-color: ${col}"></div><span class="text-slate-700 dark:text-slate-300 font-bold">${s}</span></div>
-                    <span class="text-slate-500">${pct.toFixed(1)}%</span>
-                </div>`;
-        }
-    });
+    if(document.getElementById('strategy-legend')) {
+        document.getElementById('strategy-legend').innerHTML = '';
+        Object.keys(strategyMap).forEach(s => {
+            if(strategyMap[s] > 0) {
+                stratLabels.push(s); stratData.push(strategyMap[s]);
+                const col = getStratColor(s); stratColors.push(col);
+                const pct = (strategyMap[s] / totalActiveValue) * 100;
+                document.getElementById('strategy-legend').innerHTML += `
+                    <div class="flex justify-between items-center text-xs font-mono w-full">
+                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full" style="background-color: ${col}"></div><span class="text-slate-700 dark:text-slate-300 font-bold">${s}</span></div>
+                        <span class="text-slate-500">${pct.toFixed(1)}%</span>
+                    </div>`;
+            }
+        });
+    }
 
     const ctxStrategy = document.getElementById('strategyChart');
     if(ctxStrategy && strategyDoughnut) strategyDoughnut.destroy();
-    if(stratData.length > 0) {
+    if(stratData.length > 0 && ctxStrategy) {
         strategyDoughnut = new Chart(ctxStrategy.getContext('2d'), {
             type: 'doughnut',
             data: { labels: stratLabels, datasets: [{ data: stratData, backgroundColor: stratColors, borderWidth: 0, hoverOffset: 4 }] },
             options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ` ₱${ctx.raw.toLocaleString()}` } } } }
         });
-    } else {
+    } else if (document.getElementById('strategy-legend')) {
         document.getElementById('strategy-legend').innerHTML = '<span class="text-xs text-slate-500">No active capital.</span>';
     }
 }
@@ -855,6 +819,7 @@ const createEmptyWl = (id) => ({
 
 function populateStrategyDropdowns() {
     const select = document.getElementById('w-setup'); 
+    if(!select) return;
     const currentVal = select.value; 
     select.innerHTML = '';
     state.strategies.forEach(s => { 
@@ -880,6 +845,7 @@ function initPlanner() {
 
 function renderWlTabs() {
     const container = document.getElementById('wl-tabs'); 
+    if(!container) return;
     container.innerHTML = '';
     
     state.watchlist.forEach((wl, i) => {
@@ -917,30 +883,32 @@ function loadWlTab(id) {
         }
     }
     
-    document.getElementById('w-ticker').value = wl.ticker; 
-    document.getElementById('w-sector').value = wl.sector || 'Others';
-    document.getElementById('w-var').value = wl.varPct; 
-    document.getElementById('w-maxpos').value = wl.maxPosPct || 25; 
-    document.getElementById('w-setup').value = wl.setup || state.strategies[0]; 
+    if(document.getElementById('w-ticker')) document.getElementById('w-ticker').value = wl.ticker; 
+    if(document.getElementById('w-sector')) document.getElementById('w-sector').value = wl.sector || 'Others';
+    if(document.getElementById('w-var')) document.getElementById('w-var').value = wl.varPct; 
+    if(document.getElementById('w-maxpos')) document.getElementById('w-maxpos').value = wl.maxPosPct || 25; 
+    if(document.getElementById('w-setup')) document.getElementById('w-setup').value = wl.setup || state.strategies[0]; 
     
-    document.getElementById('w-tranche').value = wl.trancheType || '100'; 
-    document.getElementById('w-stop-type').value = wl.stopType || '100'; 
-    document.getElementById('w-target-type').value = wl.targetType || '100'; 
+    if(document.getElementById('w-tranche')) document.getElementById('w-tranche').value = wl.trancheType || '100'; 
+    if(document.getElementById('w-stop-type')) document.getElementById('w-stop-type').value = wl.stopType || '100'; 
+    if(document.getElementById('w-target-type')) document.getElementById('w-target-type').value = wl.targetType || '100'; 
     
     changeTrancheType(wl.trancheType, false);
     changeStopType(wl.stopType, false);
     changeTargetType(wl.targetType, false);
     
     const prev = document.getElementById('img-preview');
-    if(wl.image) { 
-        prev.src = wl.image; 
-        prev.classList.remove('hidden'); 
-        document.getElementById('clear-img').classList.remove('hidden'); 
-        document.getElementById('img-placeholder').classList.add('hidden'); 
-    } else { 
-        prev.classList.add('hidden'); 
-        document.getElementById('clear-img').classList.add('hidden'); 
-        document.getElementById('img-placeholder').classList.remove('hidden'); 
+    if(prev) {
+        if(wl.image) { 
+            prev.src = wl.image; 
+            prev.classList.remove('hidden'); 
+            document.getElementById('clear-img').classList.remove('hidden'); 
+            document.getElementById('img-placeholder').classList.add('hidden'); 
+        } else { 
+            prev.classList.add('hidden'); 
+            document.getElementById('clear-img').classList.add('hidden'); 
+            document.getElementById('img-placeholder').classList.remove('hidden'); 
+        }
     }
     
     renderWlTabs(); 
@@ -1056,10 +1024,11 @@ function updateTarget(idx, val) {
 
 function calcPlanner() {
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
+    if(!wl) return;
     const { buyingPower, masterCapital } = runEngine(false);
 
     const capBudget = masterCapital * ((wl.maxPosPct || 25) / 100); 
-    document.getElementById('w-maxpos-peso').innerText = `Limit: ${fmtPHP(capBudget)}`;
+    if(document.getElementById('w-maxpos-peso')) document.getElementById('w-maxpos-peso').innerText = `Limit: ${fmtPHP(capBudget)}`;
 
     let aep = 0, valid = true; 
     const [e1, e2, e3] = wl.entries || [0, 0, 0];
@@ -1074,9 +1043,9 @@ function calcPlanner() {
     wl.computedAEP = valid ? aep : 0; 
     wl.isTrancheValid = valid;
     
-    document.getElementById('w-aep').innerText = wl.computedAEP ? `₱${wl.computedAEP.toFixed(4)}` : "₱0.00"; 
+    if(document.getElementById('w-aep')) document.getElementById('w-aep').innerText = wl.computedAEP ? `₱${wl.computedAEP.toFixed(4)}` : "₱0.00"; 
     const bl = getBoardLot(wl.computedAEP || 0); 
-    document.getElementById('w-boardlot').innerText = bl.toLocaleString();
+    if(document.getElementById('w-boardlot')) document.getElementById('w-boardlot').innerText = bl.toLocaleString();
 
     let computedStop = 0;
     const [s1, s2] = wl.stopEntries || [0, 0];
@@ -1085,7 +1054,7 @@ function calcPlanner() {
     else if (wl.stopType === '50-50' && s1 && s2) computedStop = (s1*0.5) + (s2*0.5);
     wl.computedStop = computedStop;
     
-    document.getElementById('w-blended-stop').innerText = wl.computedStop ? `₱${wl.computedStop.toFixed(4)}` : "₱0.00";
+    if(document.getElementById('w-blended-stop')) document.getElementById('w-blended-stop').innerText = wl.computedStop ? `₱${wl.computedStop.toFixed(4)}` : "₱0.00";
 
     let computedTarget = 0;
     const [t1, t2] = wl.targetEntries || [0, 0];
@@ -1094,7 +1063,7 @@ function calcPlanner() {
     else if (wl.targetType === '50-50' && t1 && t2) computedTarget = (t1*0.5) + (t2*0.5);
     wl.computedTarget = computedTarget;
     
-    document.getElementById('w-blended-target').innerText = wl.computedTarget ? `₱${wl.computedTarget.toFixed(4)}` : "₱0.00";
+    if(document.getElementById('w-blended-target')) document.getElementById('w-blended-target').innerText = wl.computedTarget ? `₱${wl.computedTarget.toFixed(4)}` : "₱0.00";
 
     if (wl.computedAEP > 0) {
         const costPerShare = wl.computedAEP * (1 + FEES.buy);
@@ -1102,25 +1071,25 @@ function calcPlanner() {
         if (wl.computedStop > 0) { 
             const stopNetPerShare = wl.computedStop * (1 - FEES.sell); 
             const stopPct = ((stopNetPerShare - costPerShare) / costPerShare) * 100; 
-            document.getElementById('w-stop-pct').innerText = `${stopPct.toFixed(2)}%`; 
+            if(document.getElementById('w-stop-pct')) document.getElementById('w-stop-pct').innerText = `${stopPct.toFixed(2)}%`; 
         } else { 
-            document.getElementById('w-stop-pct').innerText = ``; 
+            if(document.getElementById('w-stop-pct')) document.getElementById('w-stop-pct').innerText = ``; 
         }
         
         if (wl.computedTarget > 0) { 
             const targetNetPerShare = wl.computedTarget * (1 - FEES.sell); 
             const targetPct = ((targetNetPerShare - costPerShare) / costPerShare) * 100; 
-            document.getElementById('w-target-pct').innerText = `+${targetPct.toFixed(2)}%`; 
+            if(document.getElementById('w-target-pct')) document.getElementById('w-target-pct').innerText = `+${targetPct.toFixed(2)}%`; 
         } else { 
-            document.getElementById('w-target-pct').innerText = ``; 
+            if(document.getElementById('w-target-pct')) document.getElementById('w-target-pct').innerText = ``; 
         }
     } else { 
-        document.getElementById('w-stop-pct').innerText = ``; 
-        document.getElementById('w-target-pct').innerText = ``; 
+        if(document.getElementById('w-stop-pct')) document.getElementById('w-stop-pct').innerText = ``; 
+        if(document.getElementById('w-target-pct')) document.getElementById('w-target-pct').innerText = ``; 
     }
 
     if (!wl.computedAEP || !wl.computedStop || !wl.ticker || wl.computedStop >= wl.computedAEP || !wl.isTrancheValid) { 
-        document.getElementById('o-shares').value = ''; 
+        if(document.getElementById('o-shares')) document.getElementById('o-shares').value = ''; 
         calcTicketFromShares(); 
         return; 
     }
@@ -1136,7 +1105,7 @@ function calcPlanner() {
     let rawShares = Math.min(idealSharesVaR, idealSharesCap, Math.floor(Math.max(0, buyingPower) / costPerShare));
     
     let finalShares = Math.floor(rawShares / bl) * bl; 
-    document.getElementById('o-shares').value = finalShares.toLocaleString();
+    if(document.getElementById('o-shares')) document.getElementById('o-shares').value = finalShares.toLocaleString();
     
     calcTicketFromShares();
 }
@@ -1149,7 +1118,8 @@ function userEditedShares(el) {
 
 function calcTicketFromShares() {
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
-    const sharesStr = document.getElementById('o-shares').value; 
+    if(!wl) return;
+    const sharesStr = document.getElementById('o-shares') ? document.getElementById('o-shares').value : '0'; 
     const sharesInput = parseInt(sharesStr.replace(/,/g, '')) || 0; 
     wl.shares = sharesInput;
     
@@ -1159,6 +1129,8 @@ function calcTicketFromShares() {
     const blWarning = document.getElementById('boardlot-warning'); 
     const actualPosPctEl = document.getElementById('w-actual-pos-pct');
     
+    if(!btnExec || !warnBox || !blWarning || !actualPosPctEl) return;
+
     const costPerShareCheck = wl.computedAEP ? wl.computedAEP * (1 + FEES.buy) : 0;
     const netStopPerShareCheck = wl.computedStop ? wl.computedStop * (1 - FEES.sell) : 0;
     const trueRiskPerShareCheck = costPerShareCheck - netStopPerShareCheck;
@@ -1179,8 +1151,8 @@ function calcTicketFromShares() {
     warnBox.classList.remove('bg-red-700/95', 'bg-red-600/90', 'bg-brand', 'bg-amber-500/90');
     warnBox.classList.add('hidden'); 
     blWarning.classList.add('hidden'); 
-    document.getElementById('ind-cost').className = "absolute top-0 left-0 w-full h-0.5 bg-transparent"; 
-    document.getElementById('ind-risk').className = "absolute top-0 left-0 w-full h-0.5 bg-transparent";
+    if(document.getElementById('ind-cost')) document.getElementById('ind-cost').className = "absolute top-0 left-0 w-full h-0.5 bg-transparent"; 
+    if(document.getElementById('ind-risk')) document.getElementById('ind-risk').className = "absolute top-0 left-0 w-full h-0.5 bg-transparent";
 
     if (buyingPower < 0) { 
         warnBox.innerHTML = `🚨 <b>MARGIN DEFICIT:</b> Negative Buying Power.`; 
@@ -1238,20 +1210,20 @@ function calcTicketFromShares() {
         winImpactPct = masterCapital > 0 ? (projProfit / masterCapital) * 100 : 0; 
     }
 
-    document.getElementById('o-cost').innerText = fmtPHP(wl.cost); 
-    document.getElementById('o-risk').innerText = fmtPHP(actualRisk); 
-    document.getElementById('o-impact-loss').innerText = `-${lossImpactPct.toFixed(2)}% Acct Impact`;
-    document.getElementById('o-profit').innerText = fmtPHP(projProfit); 
-    document.getElementById('o-impact-win').innerText = `+${winImpactPct.toFixed(2)}% Acct Impact`; 
-    document.getElementById('o-rr').innerText = `${rr.toFixed(2)} R`;
+    if(document.getElementById('o-cost')) document.getElementById('o-cost').innerText = fmtPHP(wl.cost); 
+    if(document.getElementById('o-risk')) document.getElementById('o-risk').innerText = fmtPHP(actualRisk); 
+    if(document.getElementById('o-impact-loss')) document.getElementById('o-impact-loss').innerText = `-${lossImpactPct.toFixed(2)}% Acct Impact`;
+    if(document.getElementById('o-profit')) document.getElementById('o-profit').innerText = fmtPHP(projProfit); 
+    if(document.getElementById('o-impact-win')) document.getElementById('o-impact-win').innerText = `+${winImpactPct.toFixed(2)}% Acct Impact`; 
+    if(document.getElementById('o-rr')) document.getElementById('o-rr').innerText = `${rr.toFixed(2)} R`;
     
     if (wl.shares > 0) {
         const bl = getBoardLot(wl.computedAEP); 
         
         if(idealSharesVaR <= idealSharesCap) {
-            document.getElementById('ind-risk').className = "absolute top-0 left-0 w-full h-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"; 
+            if(document.getElementById('ind-risk')) document.getElementById('ind-risk').className = "absolute top-0 left-0 w-full h-0.5 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"; 
         } else {
-            document.getElementById('ind-cost').className = "absolute top-0 left-0 w-full h-0.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]";
+            if(document.getElementById('ind-cost')) document.getElementById('ind-cost').className = "absolute top-0 left-0 w-full h-0.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]";
         }
 
         if (wl.shares % bl !== 0) { 
@@ -1290,9 +1262,8 @@ function calcTicketFromShares() {
 }
 
 function executeTrade() { 
-    saveState(); 
     const wl = state.watchlist.find(w => w.id === state.activeWlId); 
-    if (!wl.valid) return; 
+    if (!wl || !wl.valid) return; 
     
     state.activeHoldings.push({ 
         id: Date.now(), 
@@ -1315,6 +1286,7 @@ function executeTrade() {
     runEngine(); 
     loadWlTab(freshWl.id); 
     switchView('dashboard'); 
+    saveData(); // THE OVERHAUL: Auto-Save
 }
 
 // ==========================================
@@ -1322,6 +1294,7 @@ function executeTrade() {
 // ==========================================
 function renderLedgers() {
     const fBody = document.getElementById('funding-body'); 
+    if(!fBody) return;
     fBody.innerHTML = '';
     
     if (state.ledger.length === 0) { 
@@ -1352,6 +1325,7 @@ function renderLedgers() {
     }
 
     const jBody = document.getElementById('journal-body'); 
+    if(!jBody) return;
     jBody.innerHTML = '';
     
     if (state.journal.length === 0) {
@@ -1445,7 +1419,6 @@ function hideCloseModal() {
 }
 
 function confirmCloseTrade() { 
-    saveState(); 
     const id = parseInt(document.getElementById('close-id').value); 
     const exit = parseFloat(document.getElementById('close-price').value); 
     const sharesToClose = parseInt(document.getElementById('close-shares').value);
@@ -1490,16 +1463,17 @@ function confirmCloseTrade() {
 
         hideCloseModal(); 
         runEngine(); 
+        saveData(); // THE OVERHAUL: Auto-Save
     } 
 }
 
 function deleteJournalEntry(id) { 
-    saveState(); 
     const idx = state.journal.findIndex(t => t.id === id); 
     if(idx > -1) { 
         state.journal.splice(idx, 1); 
         runEngine(); 
         renderLedgers(); 
+        saveData(); // Added Auto-Save to deletions as well
     } 
 }
 
@@ -1519,8 +1493,6 @@ function submitLedger() {
     const dateInput = document.getElementById('modal-date').value;
     const finalDate = dateInput ? new Date(dateInput).toISOString() : new Date().toISOString();
 
-    saveState(); 
-    
     state.ledger.push({ 
         id: Date.now(), 
         date: finalDate, 
@@ -1533,37 +1505,43 @@ function submitLedger() {
     runEngine(); 
     calcPlanner(); 
     renderLedgers(); 
+    saveData(); // THE OVERHAUL: Auto-Save
 }
 
 // ==========================================
 // 10. PROJECTIONS (EXPECTANCY FORECASTER)
 // ==========================================
 function updateHorizonLbl(val) {
-    document.getElementById('horizon-lbl').innerText = val + (val == 1 ? " Year" : " Years");
+    if(document.getElementById('horizon-lbl')) {
+        document.getElementById('horizon-lbl').innerText = val + (val == 1 ? " Year" : " Years");
+    }
 }
 
 function initSimulatorTab() { 
-    if (document.getElementById('rbaf-port').value === "") resetSimulatorToActuals(); 
+    const portEl = document.getElementById('rbaf-port');
+    if (portEl && portEl.value === "") resetSimulatorToActuals(); 
     else runSimulatorCore(); 
 }
 
 function resetSimulatorToActuals() {
     const rawCap = runEngine(false).masterCapital;
-    document.getElementById('rbaf-port').value = rawCap.toLocaleString('en-US'); 
-    document.getElementById('rbaf-pos').value = (globalActualStats.posSizePct * 100).toFixed(1); 
-    document.getElementById('rbaf-target').value = 50; 
-    document.getElementById('rbaf-wr').value = (globalActualStats.wr * 100).toFixed(1); 
-    document.getElementById('rbaf-gain').value = (globalActualStats.avgGainPct * 100).toFixed(1); 
-    document.getElementById('rbaf-loss').value = (Math.abs(globalActualStats.avgLossPct) * 100).toFixed(1); 
-    document.getElementById('rbaf-freq-num').value = 5; 
-    document.getElementById('rbaf-freq-unit').value = 'week';
-    document.getElementById('rbaf-horizon').value = 5; 
+    if(document.getElementById('rbaf-port')) document.getElementById('rbaf-port').value = rawCap.toLocaleString('en-US'); 
+    if(document.getElementById('rbaf-pos')) document.getElementById('rbaf-pos').value = (globalActualStats.posSizePct * 100).toFixed(1); 
+    if(document.getElementById('rbaf-target')) document.getElementById('rbaf-target').value = 50; 
+    if(document.getElementById('rbaf-wr')) document.getElementById('rbaf-wr').value = (globalActualStats.wr * 100).toFixed(1); 
+    if(document.getElementById('rbaf-gain')) document.getElementById('rbaf-gain').value = (globalActualStats.avgGainPct * 100).toFixed(1); 
+    if(document.getElementById('rbaf-loss')) document.getElementById('rbaf-loss').value = (Math.abs(globalActualStats.avgLossPct) * 100).toFixed(1); 
+    if(document.getElementById('rbaf-freq-num')) document.getElementById('rbaf-freq-num').value = 5; 
+    if(document.getElementById('rbaf-freq-unit')) document.getElementById('rbaf-freq-unit').value = 'week';
+    if(document.getElementById('rbaf-horizon')) document.getElementById('rbaf-horizon').value = 5; 
     updateHorizonLbl(5);
     
     runSimulatorCore();
 }
 
 function runSimulatorCore() {
+    if(!document.getElementById('base-wr')) return; // Safety check
+
     document.getElementById('base-wr').innerText = `${(globalActualStats.wr * 100).toFixed(1)}%`; 
     document.getElementById('base-gain').innerText = `+${(globalActualStats.avgGainPct * 100).toFixed(1)}%`; 
     document.getElementById('base-loss').innerText = `-${(Math.abs(globalActualStats.avgLossPct) * 100).toFixed(1)}%`; 
@@ -1831,7 +1809,6 @@ function closeStrategyModal() {
 }
 
 function addStrategy() { 
-    saveState(); 
     const val = document.getElementById('new-strategy-input').value.trim(); 
     if(!val || state.strategies.includes(val)) return; 
     
@@ -1840,6 +1817,7 @@ function addStrategy() {
     openStrategyModal(); 
     populateStrategyDropdowns(); 
     runEngine(); 
+    saveData();
 }
 
 function deleteStrategy(idx) { 
@@ -1851,11 +1829,11 @@ function deleteStrategy(idx) {
     
     if(!confirm(`Are you sure you want to permanently delete the "${stratName}" strategy?`)) return;
 
-    saveState(); 
     state.strategies.splice(idx, 1); 
     openStrategyModal(); 
     populateStrategyDropdowns(); 
     runEngine(); 
+    saveData();
 }
 
 function openLedger() { 
@@ -1937,9 +1915,6 @@ async function saveData() {
 // ==========================================
 // EXPOSE FUNCTIONS TO WINDOW FOR HTML BUTTONS
 // ==========================================
-window.exploreSandbox = exploreSandbox;
-window.showStartFresh = showStartFresh;
-window.hideStartFresh = hideStartFresh;
 window.confirmReset = confirmReset;
 window.executeNuclearReset = executeNuclearReset;
 window.openResetModal = openResetModal;
@@ -1948,7 +1923,6 @@ window.checkResetCode = checkResetCode;
 window.switchView = switchView;
 window.undo = undo;
 window.saveData = saveData;
-window.loadData = loadData;
 window.updateWl = updateWl;
 window.changeTrancheType = changeTrancheType;
 window.changeStopType = changeStopType;
