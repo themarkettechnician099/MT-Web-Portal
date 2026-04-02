@@ -25,12 +25,11 @@ onAuthStateChanged(auth, (user) => {
         currentUser = user;
         loadCloudProfile();
     } else {
-        // Redirect to master login if unauthenticated
         window.location.href = '../index.html';
     }
 });
 
-// V2.14 Defensive Architecture: Actively heals missing or corrupted arrays from old save files
+// V2.14 OVERHAUL: Aggressive Schema Validation
 function healState() {
     if (!state.strategies || state.strategies.length === 0) {
         state.strategies = ['Breakout', 'Bounce Play', 'Swing'];
@@ -40,11 +39,12 @@ function healState() {
     if (!state.journal) state.journal = [];
     if (!state.ledger) state.ledger = [];
 
-    // DEEP HEAL: Upgrades old cloud save files to the modern V1.8 architecture
     state.watchlist.forEach(wl => {
-        if (!wl.trancheType) wl.trancheType = '100';
-        if (!wl.stopType) wl.stopType = '100';
-        if (!wl.targetType) wl.targetType = '100';
+        // AGGRESSIVE HEAL: If the string is corrupted or missing, force it to '100' so the UI doesn't crash
+        if (!['100', '50-50', '50-30-20'].includes(wl.trancheType)) wl.trancheType = '100';
+        if (!['100', '50-50'].includes(wl.stopType)) wl.stopType = '100';
+        if (!['100', '50-50'].includes(wl.targetType)) wl.targetType = '100';
+        
         if (!wl.entries) wl.entries = [0, 0, 0];
         if (!wl.stopEntries) wl.stopEntries = [0, 0];
         if (!wl.targetEntries) wl.targetEntries = [0, 0];
@@ -55,8 +55,8 @@ function healState() {
     });
     
     state.activeHoldings.forEach(pos => {
-        if (!pos.targetType) pos.targetType = '100';
-        if (!pos.stopType) pos.stopType = '100';
+        if (!['100', '50-50'].includes(pos.targetType)) pos.targetType = '100';
+        if (!['100', '50-50'].includes(pos.stopType)) pos.stopType = '100';
         if (!pos.targetEntries) pos.targetEntries = [0, 0];
         if (!pos.stopEntries) pos.stopEntries = [0, 0];
     });
@@ -70,18 +70,20 @@ async function loadCloudProfile() {
         if (docSnap.exists()) {
             const data = docSnap.data();
             
-            if (data.tradingSandboxState) {
-                state = data.tradingSandboxState;
+            // LEGACY RESCUE: Look for the new state, but fallback to the old states to rescue your real data
+            const cloudState = data.tradingSandboxState || data.appNameState || data.state;
+            
+            if (cloudState) {
+                state = cloudState;
                 healState();
                 
-                // Trading Sandbox check: Does the ledger have entries?
                 if (state.ledger && state.ledger.length > 0) {
                     document.getElementById('init-modal').classList.add('hidden');
                     runEngine();
                     initPlanner();
                     switchView('dashboard');
                 } else {
-                    console.log("Empty save. Forcing Welcome Screen.");
+                    console.log("Empty ledger. Forcing Welcome Screen.");
                     document.getElementById('init-modal').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
                 }
                 
@@ -168,7 +170,6 @@ let state = {
     ]
 };
 
-// V2.14 Fix: Base posSizePct defaults to 0 instead of 0.20 to prevent ghost data after reset
 let globalActualStats = { wr: 0.40, avgGainPct: 0.08, avgLossPct: -0.05, posSizePct: 0.20 };
 let undoStack = []; 
 let isUndoAction = false;
@@ -178,7 +179,6 @@ function saveState() {
     undoStack.push(JSON.stringify(state));
     if (undoStack.length > 10) undoStack.shift();
     document.getElementById('btn-undo').disabled = false;
-    // Also enable mobile undo button
     const mobUndo = document.getElementById('mob-btn-undo');
     if (mobUndo) mobUndo.disabled = false;
 }
@@ -347,7 +347,6 @@ function executeNuclearReset() {
     state.activeHoldings = []; 
     state.journal = []; 
     
-    // PATCH 3: The True "Start Fresh" - Completely obliterate the watchlist
     state.watchlist = [createEmptyWl(Date.now())]; 
     state.activeWlId = state.watchlist[0].id;
     
@@ -360,7 +359,7 @@ function executeNuclearReset() {
     if (distChart) distChart.destroy();
     if (stratChart) stratChart.destroy();
     
-    runEngine(); // This will enforce the new 0.0% posSizePct
+    runEngine(); 
 }
 
 function confirmReset() {
@@ -372,7 +371,6 @@ function confirmReset() {
     state.activeHoldings = []; 
     state.journal = []; 
     
-    // PATCH 3: The True "Start Fresh"
     state.watchlist = [createEmptyWl(Date.now())]; 
     state.activeWlId = state.watchlist[0].id;
     
@@ -475,10 +473,8 @@ function runEngine(skipGallery = false) {
         globalActualStats.avgGainPct = wins.length ? wins.reduce((s,t) => s + (t.netPnl/t.cost), 0) / wins.length : 0;
         globalActualStats.avgLossPct = losses.length ? losses.reduce((s,t) => s + (t.netPnl/t.cost), 0) / losses.length : 0;
         
-        // Average the immutable posSizePct, defaulting to 0 if undefined
         globalActualStats.posSizePct = state.journal.reduce((s,t) => s + (t.posSizePct !== undefined ? t.posSizePct : 0), 0) / total;
     } else {
-        // V2.14 Fix: Pos Size now cleanly defaults to 0%
         globalActualStats = { wr: 0, avgGainPct: 0, avgLossPct: 0, posSizePct: 0 };
     }
 
@@ -574,8 +570,8 @@ function calculateStrategyStatsData() {
     const labels = []; const barData = []; const lineData = []; const colors = [];
     Object.keys(stats).forEach(s => {
         labels.push(s);
-        barData.push(stats[s].count); // Executions
-        lineData.push((stats[s].wins / stats[s].count) * 100); // Win %
+        barData.push(stats[s].count); 
+        lineData.push((stats[s].wins / stats[s].count) * 100); 
         colors.push(getStratColor(s));
     });
     return { labels, barData, lineData, colors };
@@ -871,7 +867,6 @@ function populateStrategyDropdowns() {
 function initPlanner() {
     populateStrategyDropdowns();
     
-    // V2.14 Defensive Architecture: Prevents loadWlTab from ever crashing on an undefined or out-of-sync activeWlId
     if (!state.watchlist || state.watchlist.length === 0) { 
         state.watchlist = [createEmptyWl(Date.now())]; 
         state.activeWlId = state.watchlist[0].id; 
@@ -912,7 +907,6 @@ function renderWlTabs() {
 function loadWlTab(id) {
     state.activeWlId = id; 
     
-    // V2.14 Defensive Architecture: Fail-safe to ensure wl is never undefined
     let wl = state.watchlist.find(w => w.id === id);
     if (!wl) {
         if (state.watchlist.length > 0) {
@@ -966,8 +960,6 @@ function changeTrancheType(type, clear = true) {
     if (clear) wl.entries = [0, 0, 0];
     
     const cont = document.getElementById('tranche-inputs'); 
-    
-    // PATCH 1: UI Airbag - Gracefully skip if HTML isn't loaded yet
     if (!cont) return;
 
     cont.innerHTML = ''; 
@@ -1002,8 +994,6 @@ function changeStopType(type, clear = true) {
     if (clear) wl.stopEntries = [0, 0];
     
     const cont = document.getElementById('stop-inputs'); 
-    
-    // PATCH 1: UI Airbag
     if (!cont) return;
 
     cont.innerHTML = ''; 
@@ -1037,8 +1027,6 @@ function changeTargetType(type, clear = true) {
     if (clear) wl.targetEntries = [0, 0];
     
     const cont = document.getElementById('target-inputs'); 
-    
-    // PATCH 1: UI Airbag
     if (!cont) return;
 
     cont.innerHTML = ''; 
@@ -1074,8 +1062,6 @@ function calcPlanner() {
     document.getElementById('w-maxpos-peso').innerText = `Limit: ${fmtPHP(capBudget)}`;
 
     let aep = 0, valid = true; 
-    
-    // PATCH 2: The Math Guards - Safely default to an array of zeroes if corrupted
     const [e1, e2, e3] = wl.entries || [0, 0, 0];
     
     if (wl.trancheType === '100') { 
@@ -1093,8 +1079,6 @@ function calcPlanner() {
     document.getElementById('w-boardlot').innerText = bl.toLocaleString();
 
     let computedStop = 0;
-    
-    // PATCH 2: Math Guards
     const [s1, s2] = wl.stopEntries || [0, 0];
     
     if (wl.stopType === '100' && s1) computedStop = s1;
@@ -1104,8 +1088,6 @@ function calcPlanner() {
     document.getElementById('w-blended-stop').innerText = wl.computedStop ? `₱${wl.computedStop.toFixed(4)}` : "₱0.00";
 
     let computedTarget = 0;
-    
-    // PATCH 2: Math Guards
     const [t1, t2] = wl.targetEntries || [0, 0];
     
     if (wl.targetType === '100' && t1) computedTarget = t1;
