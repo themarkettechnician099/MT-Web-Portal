@@ -484,7 +484,7 @@ function runEngine(skipGallery = false) {
 let distChart = null; 
 let stratChart = null;
 let sectorDoughnut = null;
-let strategyDoughnut = null;
+let allocationDoughnut = null; // Replaced Strategy with Capital Deployment
 
 // THE SVG FIX: Safely assign attributes to prevent crashes
 function updateDials() {
@@ -647,16 +647,12 @@ function renderDashboardCharts() {
 
     let totalActiveValue = 0;
     let sectorMap = {};
-    let strategyMap = {};
     
     if (Array.isArray(state.activeHoldings)) {
         state.activeHoldings.forEach(pos => {
             totalActiveValue += pos.netValue;
             if(!sectorMap[pos.sector]) sectorMap[pos.sector] = 0;
             sectorMap[pos.sector] += pos.netValue;
-            
-            if(!strategyMap[pos.strategy]) strategyMap[pos.strategy] = 0;
-            strategyMap[pos.strategy] += pos.netValue;
         });
     }
 
@@ -689,33 +685,59 @@ function renderDashboardCharts() {
         document.getElementById('sector-legend').innerHTML = '<span class="text-xs text-slate-500">No active capital.</span>';
     }
 
-    const stratLabels = []; const stratData = []; const stratColors = [];
-    if(document.getElementById('strategy-legend')) {
-        document.getElementById('strategy-legend').innerHTML = '';
-        Object.keys(strategyMap).forEach(s => {
-            if(strategyMap[s] > 0) {
-                stratLabels.push(s); stratData.push(strategyMap[s]);
-                const col = getStratColor(s); stratColors.push(col);
-                const pct = (strategyMap[s] / totalActiveValue) * 100;
-                document.getElementById('strategy-legend').innerHTML += `
-                    <div class="flex justify-between items-center text-xs font-mono w-full">
-                        <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full" style="background-color: ${col}"></div><span class="text-slate-700 dark:text-slate-300 font-bold">${s}</span></div>
-                        <span class="text-slate-500">${pct.toFixed(1)}%</span>
-                    </div>`;
-            }
-        });
+    // --- NEW CAPITAL DEPLOYMENT LOGIC (Replaces Strategy Exposure) ---
+    let masterCap = 0;
+    let depCost = 0;
+    if(Array.isArray(state.ledger)) state.ledger.forEach(tx => masterCap += (tx.type === 'DEPOSIT' ? tx.amount : -tx.amount));
+    if(Array.isArray(state.journal)) state.journal.forEach(t => masterCap += t.netPnl);
+    
+    const allocLabels = []; const allocData = []; const allocColors = [];
+    
+    if(document.getElementById('allocation-legend')) {
+        document.getElementById('allocation-legend').innerHTML = '';
+        
+        if (Array.isArray(state.activeHoldings)) {
+            state.activeHoldings.forEach((pos, idx) => {
+                const cost = pos.shares * pos.avgCost * (1 + FEES.buy);
+                depCost += cost;
+                
+                if(cost > 0) {
+                    allocLabels.push(pos.ticker);
+                    allocData.push(cost);
+                    const col = barColors[idx % barColors.length]; // Matches top bar colors
+                    allocColors.push(col);
+                    
+                    const pct = masterCap > 0 ? (cost / masterCap) * 100 : 0;
+                    document.getElementById('allocation-legend').innerHTML += `
+                        <div class="flex justify-between items-center text-xs font-mono w-full">
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full" style="background-color: ${col}"></div><span class="text-slate-700 dark:text-slate-300 font-bold">${pos.ticker}</span></div>
+                            <span class="text-slate-500">${pct.toFixed(1)}%</span>
+                        </div>`;
+                }
+            });
+        }
+        
+        const cash = Math.max(0, masterCap - depCost);
+        allocLabels.push('CASH');
+        allocData.push(cash);
+        allocColors.push('#94a3b8'); // Neutral slate color for unallocated cash
+        
+        const cashPct = masterCap > 0 ? (cash / masterCap) * 100 : (masterCap === 0 ? 100 : 0);
+        document.getElementById('allocation-legend').innerHTML += `
+            <div class="flex justify-between items-center text-xs font-mono w-full mt-1 pt-1 border-t border-slate-200 dark:border-slate-700/50">
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-slate-400"></div><span class="text-slate-700 dark:text-slate-300 font-bold">CASH</span></div>
+                <span class="text-slate-500">${cashPct.toFixed(1)}%</span>
+            </div>`;
     }
 
-    const ctxStrategy = document.getElementById('strategyChart');
-    if(ctxStrategy && strategyDoughnut) strategyDoughnut.destroy();
-    if(stratData.length > 0 && ctxStrategy) {
-        strategyDoughnut = new Chart(ctxStrategy.getContext('2d'), {
+    const ctxAlloc = document.getElementById('allocationChart');
+    if(ctxAlloc && allocationDoughnut) allocationDoughnut.destroy();
+    if(allocData.length > 0 && ctxAlloc) {
+        allocationDoughnut = new Chart(ctxAlloc.getContext('2d'), {
             type: 'doughnut',
-            data: { labels: stratLabels, datasets: [{ data: stratData, backgroundColor: stratColors, borderWidth: 0, hoverOffset: 4 }] },
-            options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ` ₱${ctx.raw.toLocaleString()}` } } } }
+            data: { labels: allocLabels, datasets: [{ data: allocData, backgroundColor: allocColors, borderWidth: 0, hoverOffset: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ` ₱${ctx.raw.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` } } } }
         });
-    } else if (document.getElementById('strategy-legend')) {
-        document.getElementById('strategy-legend').innerHTML = '<span class="text-xs text-slate-500">No active capital.</span>';
     }
 }
 
