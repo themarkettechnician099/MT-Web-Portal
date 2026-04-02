@@ -39,6 +39,27 @@ function healState() {
     if (!state.watchlist) state.watchlist = [];
     if (!state.journal) state.journal = [];
     if (!state.ledger) state.ledger = [];
+
+    // DEEP HEAL: Upgrades old cloud save files to the modern V1.8 architecture
+    state.watchlist.forEach(wl => {
+        if (!wl.trancheType) wl.trancheType = '100';
+        if (!wl.stopType) wl.stopType = '100';
+        if (!wl.targetType) wl.targetType = '100';
+        if (!wl.entries) wl.entries = [0, 0, 0];
+        if (!wl.stopEntries) wl.stopEntries = [0, 0];
+        if (!wl.targetEntries) wl.targetEntries = [0, 0];
+        if (!wl.setup) wl.setup = state.strategies[0];
+        if (!wl.sector) wl.sector = 'Others';
+        if (!wl.maxPosPct) wl.maxPosPct = 25;
+        if (!wl.varPct) wl.varPct = 1.0;
+    });
+    
+    state.activeHoldings.forEach(pos => {
+        if (!pos.targetType) pos.targetType = '100';
+        if (!pos.stopType) pos.stopType = '100';
+        if (!pos.targetEntries) pos.targetEntries = [0, 0];
+        if (!pos.stopEntries) pos.stopEntries = [0, 0];
+    });
 }
 
 async function loadCloudProfile() {
