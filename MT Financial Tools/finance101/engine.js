@@ -90,9 +90,13 @@ async function loadCloudProfile() {
             closeModal(); // Ensure welcome screen drops on successful auto-load
         } else {
             console.log("No existing MT Finance 101 profile found in cloud. Ready for fresh setup.");
+            let modal = document.getElementById('welcome_modal');
+            if (modal) modal.style.display = 'flex'; // Trigger welcome ONLY for new users
         }
     } catch (error) {
         console.error("Error loading cloud profile:", error);
+        let modal = document.getElementById('welcome_modal');
+        if (modal) modal.style.display = 'flex'; // Fallback for errors
     }
 }
 
@@ -1336,8 +1340,4 @@ window.onload = function() {
     Chart.defaults.color = savedTheme === 'dark' ? '#94a3b8' : '#64748b'; 
 
     runOS();
-
-    // For testing: Bypass localStorage check to force Welcome Modal (Optional)
-    let modal = document.getElementById('welcome_modal');
-    if(modal) modal.style.display = 'flex';
 };
