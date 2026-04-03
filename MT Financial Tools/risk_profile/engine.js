@@ -17,6 +17,12 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 let currentUser = null;
 
+// --- UX ENHANCEMENT: Trigger initial psychological load ---
+setTimeout(() => {
+    const bar = document.getElementById('loading-progress');
+    if(bar) bar.style.width = '92%';
+}, 50);
+
 /**
  * MT OS: Structural Risk Assessment Sandbox v1.6 (Engine - SaaS Module)
  * Architecture: Strict MVC + Stable Baseline + Copywriting Polish + Firestore Auth
@@ -260,9 +266,6 @@ const MathEngine = {
         
         let isZeroInputFailsafe = false;
         if (capMass === 0 && velocity === 0) isZeroInputFailsafe = true;
-
-        if (safeAge >= 55) isYieldFlipped = true;
-        if (safeAge < 40 && capMass >= 20000000) isRichYoung = true;
 
         if (isZeroInputFailsafe) {
             isCriticalFailsafe = true;
@@ -801,6 +804,75 @@ const Painter = {
 };
 
 // --- 4. STATE MANAGEMENT (Firestore) ---
+
+// --- BASELINE SECURITY: State Sanitizer ---
+// Converts objects back to arrays if corrupted by Firebase sparse array bug, and strips nulls
+function healState(data) {
+    if (!data) return null;
+    let healed = JSON.parse(JSON.stringify(data));
+    
+    function traverseAndHeal(obj) {
+        if (obj && typeof obj === 'object') {
+            const keys = Object.keys(obj);
+            // If Firebase turned a sparse array into a numeric-keyed object
+            const isCorruptArray = keys.length > 0 && Array.isArray(obj) === false && keys.every(k => !isNaN(parseInt(k, 10)));
+            
+            if (isCorruptArray) {
+                obj = Object.values(obj).filter(val => val !== null && val !== undefined);
+            } else {
+                for (let k in obj) {
+                    obj[k] = traverseAndHeal(obj[k]);
+                }
+            }
+        }
+        return obj;
+    }
+    return traverseAndHeal(healed);
+}
+
+// --- UX ENHANCEMENT: Save & Exit Sequence ---
+async function saveAndExit() {
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingProgress = document.getElementById('loading-progress');
+    const indicator = document.getElementById('saveIndicator');
+    
+    // Update header to show sync status immediately
+    if (indicator) {
+        indicator.textContent = "Syncing...";
+        indicator.style.opacity = '1';
+    }
+
+    // Bring back the loading screen
+    if (loadingScreen) {
+        loadingScreen.style.display = 'flex';
+        // Force reflow to ensure the transition fires
+        void loadingScreen.offsetWidth;
+        loadingScreen.style.opacity = '1';
+    }
+    if (loadingProgress) {
+        loadingProgress.style.transition = 'none';
+        loadingProgress.style.width = '50%';
+        void loadingProgress.offsetWidth;
+        loadingProgress.style.transition = 'all 800ms ease-out';
+        loadingProgress.style.width = '90%';
+    }
+
+    // Force a save with current override level
+    const currentOverride = currentGlobalData ? currentGlobalData.finalLevel : null;
+    await saveToStorage(currentOverride);
+    
+    if (indicator) {
+        indicator.textContent = "Saved! ✓";
+    }
+    
+    if (loadingProgress) loadingProgress.style.width = '100%';
+    
+    // Slight delay so the user registers the 100% completion before redirect
+    setTimeout(() => {
+        window.location.href = '../index.html';
+    }, 400);
+}
+
 async function saveToStorage(overrideLevel) {
     const uiState = {
         targetAge: document.getElementById('f_targetAge').value,
@@ -808,22 +880,27 @@ async function saveToStorage(overrideLevel) {
         isRealWealth: document.getElementById('toggleRealWealth').checked
     };
 
-    const data = {
+    const rawData = {
         inputs: userInputsState,
-        override: overrideLevel,
+        override: overrideLevel !== undefined ? overrideLevel : null, // Baseline fallback
         yields: globalYields,
         ui: uiState
     };
     
-    localStorage.setItem('mtos_sandbox_state', JSON.stringify(data));
+    // BASELINE SECURITY: Strip all undefined values to null to prevent Firebase crash
+    const sanitizedData = JSON.parse(JSON.stringify(rawData, (key, val) => val === undefined ? null : val));
+    
+    localStorage.setItem('mtos_sandbox_state', JSON.stringify(sanitizedData));
     
     if (currentUser) {
         try {
             const userRef = doc(db, 'users', currentUser.uid);
-            await setDoc(userRef, { riskAssessmentState: data }, { merge: true });
+            await setDoc(userRef, { riskAssessmentState: sanitizedData }, { merge: true });
             
             const indicator = document.getElementById('saveIndicator');
-            if(indicator) {
+            // Ensure we don't overwrite the "Syncing..." text if saveAndExit was triggered
+            if(indicator && indicator.textContent !== "Syncing...") {
+                indicator.textContent = "💾 Auto-saved";
                 indicator.style.opacity = '1';
                 setTimeout(() => { indicator.style.opacity = '0'; }, 2000);
             }
@@ -841,11 +918,12 @@ async function loadCloudProfile() {
         const docSnap = await getDoc(userRef);
         
         if (docSnap.exists() && docSnap.data().riskAssessmentState) {
-            const data = docSnap.data().riskAssessmentState;
+            let data = docSnap.data().riskAssessmentState;
+            data = healState(data); // Apply baseline array repair
             applyLoadedData(data);
         } else {
             const saved = localStorage.getItem('mtos_sandbox_state');
-            if (saved) applyLoadedData(JSON.parse(saved));
+            if (saved) applyLoadedData(healState(JSON.parse(saved)));
         }
     } catch (error) {
         console.error("Error loading from cloud:", error);
@@ -1168,15 +1246,32 @@ window.runArchitect = function(overrideLevel = null, resetTargetAge = true) {
 // --- FIREBASE AUTH LISTENER & INITIALIZATION ---
 updateTargetAgeSliderMin();
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
-        loadCloudProfile();
+        await loadCloudProfile();
+        
+        // Data is loaded, finish the loading bar
+        const loadingProgress = document.getElementById('loading-progress');
+        const loadingScreen = document.getElementById('loading-screen');
+        
+        if (loadingProgress) loadingProgress.style.width = '100%';
+        
+        setTimeout(() => {
+            if (loadingScreen) {
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 300); // Wait for fade out
+            }
+        }, 400); // Hold at 100% briefly for visual satisfaction
+
     } else {
         // Force redirect to the centralized master login page
         window.location.href = "../index.html";
     }
 });
+
 // ==========================================
 // EXPOSE FUNCTIONS TO WINDOW FOR HTML BUTTONS
 // ==========================================
@@ -1186,3 +1281,6 @@ window.initiateUnlockSequence = initiateUnlockSequence;
 window.initiateLockSequence = initiateLockSequence;
 window.updateProjectionView = updateProjectionView;
 window.handleThermostatChange = handleThermostatChange;
+// --- PATCH: Expose Painter & UX Actions ---
+window.Painter = Painter; 
+window.saveAndExit = saveAndExit;
