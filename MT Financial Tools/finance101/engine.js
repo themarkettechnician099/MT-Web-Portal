@@ -20,18 +20,56 @@ const db = getFirestore(app);
 
 let currentUserUid = null;
 
+// ==========================================================================
+// UX ARCHITECTURE: LOADERS & EXIT SEQUENCES
+// ==========================================================================
+function initLoader() {
+    let bar = document.getElementById('loading_progress');
+    if (bar) {
+        // Instantly shoot to 92% to mask Firebase latency
+        setTimeout(() => { bar.style.width = '92%'; }, 50);
+    }
+}
+
+function dismissLoader() {
+    let bar = document.getElementById('loading_progress');
+    let screen = document.getElementById('loading_screen');
+    if (bar && screen) {
+        bar.style.width = '100%';
+        setTimeout(() => {
+            screen.style.opacity = '0';
+            setTimeout(() => { screen.style.display = 'none'; }, 300);
+        }, 200);
+    }
+}
+
+async function saveAndExit() {
+    let screen = document.getElementById('loading_screen');
+    let bar = document.getElementById('loading_progress');
+    if (screen) {
+        screen.style.display = 'flex';
+        screen.offsetHeight; // Force reflow
+        screen.style.opacity = '1';
+        if (bar) bar.style.width = '100%';
+    }
+    
+    await saveProfile(true); // Silent save
+    
+    setTimeout(() => {
+        window.location.href = '../index.html'; // Redirect to master login
+    }, 500);
+}
+
 // Auth Observer: Gatekeeper Logic
 onAuthStateChanged(auth, (user) => {
     if (user) {
         // User is authenticated
         currentUserUid = user.uid;
         
-        // Update UI buttons to reflect Cloud state
-        let btnWelcomeLoad = document.getElementById('btn_welcome_load');
-        if (btnWelcomeLoad) btnWelcomeLoad.innerText = "Load Cloud Profile";
-        
         // Automatically fetch data on load
-        loadCloudProfile();
+        loadCloudProfile().then(() => {
+            dismissLoader(); // Data loaded, drop the shield
+        });
     } else {
         // No user authenticated: Immediate redirect to master login
         window.location.href = '../index.html';
@@ -56,11 +94,6 @@ async function loadCloudProfile() {
     } catch (error) {
         console.error("Error loading cloud profile:", error);
     }
-}
-
-// Rewired loadProfile to trigger manual cloud fetch if user clicks "Load" buttons
-function loadProfile() {
-    loadCloudProfile();
 }
 
 /* --------------------------------------------------------------------------
@@ -341,7 +374,7 @@ function resetAllData() {
     }
 }
 
-// Integrated Cloud Save Protocol
+// Integrated Cloud Save Protocol with UX Feedback
 async function saveProfile(silent = false) {
     let profile = {
         age: document.getElementById('asm_age').value,
@@ -371,27 +404,42 @@ async function saveProfile(silent = false) {
         }
     });
 
-    // Backup to local storage
-    localStorage.setItem('mt_os_profile', JSON.stringify(profile));
-    
-    // Cloud Sync: Push state to Firestore under the unique mtFinance101Profile key
-    if (currentUserUid) {
-        try {
-            let userDocRef = doc(db, "users", currentUserUid);
-            await setDoc(userDocRef, { mtFinance101Profile: profile }, { merge: true });
-        } catch (error) {
-            console.error("Failed to sync profile to cloud:", error);
-        }
-    }
-    
-    // UI Feedback (Silenced the forced JSON download for SaaS)
+    // UI Feedback: Syncing State
     if (!silent) {
         let btns = document.querySelectorAll('.icon-btn.save, .btn-action.save');
         btns.forEach(btn => {
-            let originalHTML = btn.innerHTML;
-            btn.innerHTML = "SAVED";
-            setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+            btn.dataset.originalHtml = btn.dataset.originalHtml || btn.innerHTML; // Cache icon
+            btn.innerHTML = "SYNCING...";
         });
+    }
+
+    try {
+        // Backup to local storage
+        localStorage.setItem('mt_os_profile', JSON.stringify(profile));
+        
+        // Cloud Sync execution
+        if (currentUserUid) {
+            let userDocRef = doc(db, "users", currentUserUid);
+            await setDoc(userDocRef, { mtFinance101Profile: profile }, { merge: true });
+        }
+        
+        // UI Feedback: Success State
+        if (!silent) {
+            let btns = document.querySelectorAll('.icon-btn.save, .btn-action.save');
+            btns.forEach(btn => {
+                btn.innerHTML = "SAVED! ✓";
+                setTimeout(() => { btn.innerHTML = btn.dataset.originalHtml; }, 2000);
+            });
+        }
+    } catch (error) {
+        console.error("Failed to sync profile to cloud:", error);
+        if (!silent) {
+            let btns = document.querySelectorAll('.icon-btn.save, .btn-action.save');
+            btns.forEach(btn => {
+                btn.innerHTML = "ERROR";
+                setTimeout(() => { btn.innerHTML = btn.dataset.originalHtml; }, 2000);
+            });
+        }
     }
 }
 
@@ -1251,8 +1299,8 @@ function renderRehabChart(canvasId, instance, labels, data, callback) {
 window.applyCommaMasking = applyCommaMasking;
 window.undoAction = undoAction;
 window.toggleTheme = toggleTheme;
-window.loadProfile = loadProfile;
 window.saveProfile = saveProfile;
+window.saveAndExit = saveAndExit;
 window.showResetModal = showResetModal;
 window.hideResetModal = hideResetModal;
 window.confirmReset = confirmReset;
@@ -1269,6 +1317,8 @@ window.addExpenseRow = addExpenseRow;
 window.runOS = runOS;
 
 window.onload = function() {
+    initLoader(); // Trigger the psychological loading bar instantly
+    
     bindMaskingListeners();
     document.querySelectorAll('.calc-trigger').forEach(input => {
         input.addEventListener('input', runOS);
