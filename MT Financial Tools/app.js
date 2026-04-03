@@ -63,6 +63,10 @@ onAuthStateChanged(auth, (user) => {
         authSection.classList.remove('hidden');
         dashboardSection.classList.add('hidden');
         userEmailDisplay.textContent = "";
+        
+        // --- NEW: Reset button states when the form reappears ---
+        if(loginBtn) loginBtn.textContent = "Sign In";
+        if(signupBtn) signupBtn.textContent = "Create Account";
     }
 });
 
@@ -115,3 +119,20 @@ logoutBtn.addEventListener('click', () => {
         console.error("Logout Error:", error);
     });
 });
+
+// 9. Handle Password Visibility Toggle
+const togglePasswordBtn = document.getElementById('toggle-password');
+const eyeOpen = document.getElementById('eye-open');
+const eyeClosed = document.getElementById('eye-closed');
+
+if (togglePasswordBtn && passwordInput && eyeOpen && eyeClosed) {
+    togglePasswordBtn.addEventListener('click', () => {
+        // Toggle the input type
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        
+        // Toggle the SVG icons
+        eyeOpen.classList.toggle('hidden');
+        eyeClosed.classList.toggle('hidden');
+    });
+}
