@@ -8,40 +8,69 @@
         /* Import Inter Font */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-        /* CSS Variables for Light/Dark Mode */
+        /* CSS Variables for Light/Dark Mode (Tactile Command Center) */
         :root {
-            --bg-color: #f8fafc;
-            --card-bg: #ffffff;
-            --text-main: #0f172a;
+            --board-bg: #e2e8f0; 
+            --panel-bg: #f1f5f9; 
+            --text-main: #1e293b;
             --text-muted: #64748b;
-            --border-color: #e2e8f0;
-            --input-bg: #f8fafc;
+            --border-color: #cbd5e1;
+            --input-bg: #e2e8f0;
+            
+            --panel-shadow: 
+                20px 20px 60px #c1c6cc, 
+                -20px -20px 60px #ffffff;
+            
+            --button-shadow: 
+                6px 6px 12px #c8ccd2, 
+                -6px -6px 12px #ffffff;
+                
+            --button-pressed-shadow: 
+                inset 6px 6px 12px #c8ccd2, 
+                inset -6px -6px 12px #ffffff;
+
             --brand-green: #63AC2A;
             --brand-green-hover: #529122;
-            --app-card-bg: #ffffff;
-            --shadow-color: rgba(0, 0, 0, 0.08);
+            --brand-green-glow: rgba(99, 172, 42, 0.4);
+            
+            --danger-red: #ef4444;
+            --danger-shadow: 
+                5px 5px 10px #c8ccd2, 
+                -5px -5px 10px #ffffff;
+                
             --wave-opacity: 0.04;
-            --icon-bg: #f1f5f9;
-            --icon-color: #334155;
         }
 
         [data-theme="dark"] {
-            --bg-color: #0f172a;
-            --card-bg: #1e293b;
+            --board-bg: #0f172a;
+            --panel-bg: #1e293b;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             --border-color: #334155;
             --input-bg: #0f172a;
-            --app-card-bg: #1e293b;
-            --shadow-color: rgba(0, 0, 0, 0.4);
+            
+            --panel-shadow: 
+                20px 20px 60px #0d1424, 
+                -20px -20px 60px #111a30;
+                
+            --button-shadow: 
+                6px 6px 12px #151d2a, 
+                -6px -6px 12px #27354c;
+                
+            --button-pressed-shadow: 
+                inset 6px 6px 12px #151d2a, 
+                inset -6px -6px 12px #27354c;
+                
+            --danger-shadow: 
+                5px 5px 10px #151d2a, 
+                -5px -5px 10px #27354c;
+                
             --wave-opacity: 0.02;
-            --icon-bg: #1e293b;
-            --icon-color: #fbbf24;
         }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
+            background-color: var(--board-bg);
             color: var(--text-main);
             display: flex;
             justify-content: center;
@@ -58,7 +87,7 @@
             position: fixed;
             inset: 0;
             z-index: 11000;
-            background-color: var(--bg-color);
+            background-color: var(--board-bg);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -94,7 +123,7 @@
             background-color: var(--border-color);
             border-radius: 9999px;
             overflow: hidden;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: var(--button-pressed-shadow);
         }
 
         #loading-progress {
@@ -102,6 +131,7 @@
             background-color: var(--brand-green);
             width: 0%;
             transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 10px var(--brand-green-glow);
         }
 
         .loading-text {
@@ -129,48 +159,52 @@
 
         @keyframes waveFlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Tactile Feedback (active:scale-95 translation) */
-        button:active, .app-card:active, .tactile-logo:active {
-            transform: scale(0.96) !important;
-            transition: transform 0.05s ease !important;
-        }
-
-        /* Theme Toggle Button */
+        /* Hardware Toggle Switch (Dark Mode) */
         .theme-toggle {
             position: absolute;
-            top: 24px;
-            right: 24px;
-            background: var(--icon-bg);
+            top: 30px;
+            right: 30px;
+            background: var(--panel-bg);
             border: none;
-            border-radius: 12px;
+            border-radius: 50%;
             width: 48px;
             height: 48px;
             display: flex;
             justify-content: center;
             align-items: center;
-            color: var(--icon-color);
+            color: var(--text-main);
             cursor: pointer;
-            box-shadow: 0 4px 6px var(--shadow-color);
+            box-shadow: var(--button-shadow);
             transition: all 0.2s ease;
             z-index: 100;
         }
         
-        .theme-toggle:hover { transform: scale(1.05); box-shadow: 0 6px 12px var(--shadow-color); }
-        .theme-toggle svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+        .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
+        .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
 
-        /* Container Layout */
+        /* The Physical Panel */
         .container {
-            background: var(--card-bg);
-            padding: 48px 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px var(--shadow-color);
+            background: var(--panel-bg);
+            padding: 50px 40px;
+            border-radius: 24px;
+            box-shadow: var(--panel-shadow);
             width: 100%;
-            max-width: 800px; 
+            max-width: 850px; 
             text-align: center;
-            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            transition: all 0.3s ease;
             position: relative;
+            border: 1px solid var(--border-color);
             z-index: 10;
         }
+
+        /* Fake Screws in the Corners */
+        .container::before, .container::after {
+            content: ''; position: absolute; width: 12px; height: 12px;
+            border-radius: 50%; background: var(--panel-bg);
+            box-shadow: inset 2px 2px 4px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.7);
+        }
+        .container::before { top: 20px; left: 20px; }
+        .container::after { top: 20px; right: 20px; }
 
         #auth-section { max-width: 400px; margin: 0 auto; }
 
@@ -183,118 +217,123 @@
             display: inline-block;
             margin-bottom: 24px;
             outline: none;
-            transition: transform 0.2s ease;
+            transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        .brand-logo { width: 65px; height: auto; }
+        .tactile-logo:active { transform: scale(0.95); }
+        .brand-logo { width: 70px; height: auto; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.1)); }
 
-        p { color: var(--text-muted); margin: 0 0 32px 0; font-size: 15px; line-height: 1.5; }
+        p { color: var(--text-muted); margin: 0 0 32px 0; font-size: 15px; font-weight: 500; line-height: 1.5; }
         form { display: flex; flex-direction: column; gap: 16px; }
 
         /* Inputs & Buttons */
         input {
-            width: 100%; padding: 16px; border: 1px solid var(--border-color); border-radius: 8px;
+            width: 100%; padding: 16px; border: 1px solid transparent; border-radius: 12px;
             box-sizing: border-box; background-color: var(--input-bg); color: var(--text-main);
             font-size: 15px; transition: all 0.2s ease; font-family: inherit;
+            box-shadow: var(--button-pressed-shadow);
         }
-        input:focus { outline: none; border-color: var(--brand-green); box-shadow: 0 0 0 3px rgba(99, 172, 42, 0.15); }
+        input:focus { outline: none; border-color: var(--brand-green); box-shadow: 0 0 0 2px var(--brand-green-glow), var(--button-pressed-shadow); }
         input::placeholder { color: var(--text-muted); }
 
         button {
-            width: 100%; padding: 16px; border: none; border-radius: 8px;
-            font-weight: 600; font-size: 16px; cursor: pointer; transition: all 0.2s ease; font-family: inherit;
+            width: 100%; padding: 16px; border: none; border-radius: 12px;
+            font-weight: 700; font-size: 16px; cursor: pointer; transition: all 0.15s ease; font-family: inherit;
         }
-        .btn-primary { background-color: var(--brand-green); color: white; margin-top: 8px; box-shadow: 0 4px 12px rgba(99, 172, 42, 0.2); }
-        .btn-primary:hover { background-color: var(--brand-green-hover); box-shadow: 0 6px 16px rgba(99, 172, 42, 0.3); }
-        .btn-secondary { background-color: transparent; color: var(--text-main); border: 1px solid var(--border-color); }
-        .btn-secondary:hover { background-color: var(--input-bg); border-color: var(--text-muted); }
-        .btn-danger { background-color: transparent; color: #ef4444; margin-top: 32px; font-size: 14px; padding: 12px; max-width: 300px; margin-left: auto; margin-right: auto; display: block; }
-        .btn-danger:hover { background-color: rgba(239, 68, 68, 0.1); }
+        .btn-primary { 
+            background-color: var(--brand-green); color: white; margin-top: 8px; 
+            box-shadow: 4px 4px 8px rgba(99, 172, 42, 0.3), -4px -4px 8px rgba(255,255,255,0.1); 
+        }
+        .btn-primary:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); transform: translateY(2px); }
+        
+        .btn-secondary { background-color: var(--panel-bg); color: var(--text-main); box-shadow: var(--button-shadow); }
+        .btn-secondary:active { box-shadow: var(--button-pressed-shadow); transform: translateY(2px); }
 
-        /* Dashboard App Grid */
+        .btn-danger {
+            background-color: var(--panel-bg);
+            color: var(--danger-red);
+            padding: 16px 32px;
+            border-radius: 12px;
+            border: 2px solid var(--danger-red);
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            box-shadow: var(--danger-shadow);
+            transition: all 0.15s ease;
+            display: inline-block;
+            margin-top: 32px;
+            max-width: 300px;
+        }
+
+        .btn-danger:active {
+            box-shadow: var(--button-pressed-shadow);
+            transform: translateY(2px);
+            background-color: rgba(239, 68, 68, 0.1);
+            border-color: transparent;
+        }
+
+        /* The Physical App Grid */
         .app-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 16px;
-            margin-top: 32px;
-            margin-bottom: 24px;
+            gap: 24px;
+            margin-top: 40px;
+            margin-bottom: 40px;
         }
 
         @media (min-width: 640px) {
-            .app-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 20px;
-            }
+            .app-grid { grid-template-columns: repeat(2, 1fr); gap: 30px; }
         }
 
-        /* The Side-by-Side Card Layout */
+        /* The Chunky Buttons (Cards) */
         .app-card {
             display: flex;
             flex-direction: row;
             align-items: flex-start;
-            gap: 16px;
-            padding: 20px;
-            background: var(--app-card-bg);
+            gap: 20px;
+            padding: 24px;
+            background: var(--panel-bg);
             text-decoration: none;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 2px 8px var(--shadow-color);
+            border-radius: 16px;
+            box-shadow: var(--button-shadow);
+            border: 2px solid transparent;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
             cursor: pointer;
         }
 
-        /* The Pristine Icon Container */
+        /* Active/Hover State - The "Push" and "Glow" */
+        .app-card:hover {
+            border-color: var(--brand-green);
+            box-shadow: 0 0 20px var(--brand-green-glow), var(--button-shadow);
+        }
+
+        .app-card:active {
+            box-shadow: var(--button-pressed-shadow);
+            transform: scale(0.98) translateY(2px);
+            border-color: transparent;
+        }
+
+        /* The Icon Housing */
         .app-card-icon {
             flex-shrink: 0;
-            width: 48px;
-            height: 48px;
+            width: 54px;
+            height: 54px;
             border-radius: 12px; 
-            background-color: rgba(99, 172, 42, 0.1);
+            box-shadow: var(--button-pressed-shadow);
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
         }
 
         .app-card-icon img {
-            width: 28px; 
-            height: 28px;
-            object-fit: contain;
+            width: 32px; height: 32px; object-fit: contain;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));
         }
 
-        /* Text Alignment */
-        .app-card-content {
-            display: flex;
-            flex-direction: column;
-            text-align: left;
-        }
-
-        .app-card h3 {
-            margin: 0 0 6px 0;
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--text-main);
-            transition: color 0.2s ease;
-            line-height: 1.2;
-        }
-
-        .app-card p {
-            margin: 0;
-            font-size: 13px;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-
-        /* Hover Interactions */
-        .app-card:hover {
-            transform: translateY(-2px);
-            border-color: var(--brand-green);
-            box-shadow: 0 8px 16px var(--shadow-color);
-        }
-
-        .app-card:hover h3 {
-            color: var(--brand-green);
-        }
+        .app-card-content { display: flex; flex-direction: column; text-align: left; }
+        .app-card h3 { margin: 0 0 8px 0; font-size: 17px; font-weight: 700; color: var(--text-main); }
+        .app-card p { margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.5; }
         
         .hidden { display: none !important; }
         #error-message { color: #ef4444; font-size: 14px; margin-top: 12px; min-height: 20px; font-weight: 500; }
