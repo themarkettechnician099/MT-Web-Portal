@@ -182,6 +182,12 @@
         .sub-nav-btn:hover { background-color: var(--border-light); color: var(--text-main); }
         .sub-nav-btn.active { background-color: var(--mt-green); color: white; }
 
+        /* TACTILE BUTTON UPGRADE */
+        .nav-btn:active, .btn-action:active, .btn-primary:active, .btn-outline:active, .sub-nav-btn:active, .btn-delete:active, .sidebar-brand:active {
+            transform: scale(0.96);
+            transition: transform 0.05s ease;
+        }
+
         .sub-panel { display: none; }
         .sub-panel.active { display: block; }
 
@@ -306,9 +312,28 @@
         .guide-formula { font-family: 'Times New Roman', Times, serif; font-size: 22px; font-style: italic; color: var(--mt-green); margin-bottom: 15px; font-weight: bold; }
         .guide-legend { display: flex; flex-direction: column; gap: 10px; text-align: left; max-width: 500px; margin: 0 auto; font-size: 13px; color: var(--text-muted); background: var(--bg-panel); padding: 15px; border-radius: 6px; border: 1px solid var(--border-light); }
         .guide-legend strong { color: var(--text-main); font-family: monospace; font-size: 14px;}
+
+        /* 11. PSYCHOLOGICAL LOADER Translation */
+        #loading_screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: var(--bg-body); z-index: 11000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.3s ease-out;
+        }
+        .pulse-anim { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .progress-track { width: 220px; height: 6px; background-color: var(--border-light); border-radius: 3px; overflow: hidden; margin-top: 20px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+        .progress-fill { height: 100%; background-color: var(--mt-green); width: 0%; transition: width 1s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .loading-text { font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-top: 10px; }
     </style>
 </head>
 <body>
+
+    <div id="loading_screen">
+        <img src="logo.png" alt="Loading..." style="width: 80px; height: 80px; object-fit: contain;" class="pulse-anim">
+        <div class="progress-track"><div id="loading_progress" class="progress-fill"></div></div>
+        <span class="loading-text pulse-anim">Initializing Environment...</span>
+    </div>
 
     <div id="welcome_modal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: var(--blur-overlay); z-index: 99999; display: flex; justify-content: center; align-items: center; display: none;">
         <div class="card" style="border-top: 3px solid var(--mt-green); padding: 30px; width: 90%; max-width: 450px;">
@@ -318,7 +343,6 @@
             <p style="color: var(--mt-green); font-size: 14px; font-weight: 700; margin-bottom: 25px;">Let's get to work.</p>
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                 <button class="btn-outline" style="margin: 0; flex: 1; min-width: 130px; color: var(--text-main); border-color: var(--border-light);" onclick="closeModal()">Explore Example</button>
-                <button class="btn-outline" id="btn_welcome_load" style="margin: 0; flex: 1; min-width: 130px;" onclick="loadProfile()">Load Save File</button>
                 <button class="btn-primary" style="margin: 0; flex: 1; min-width: 130px; background-color: var(--status-red);" onclick="startFreshWelcome()">Start Fresh</button>
             </div>
         </div>
@@ -339,13 +363,13 @@
     <div class="app-wrapper">
         
         <div class="sidebar">
-            <div class="sidebar-brand">
+            <button class="sidebar-brand" style="border: none; background: transparent; cursor: pointer; text-align: left; width: 100%; outline: none;" onclick="saveAndExit()">
                 <div class="mt-logo"><img src="logo.png" alt="MT Logo"></div>
                 <div class="brand-text">
                     <span class="brand-title">Finance 101</span>
                     <span class="brand-subtitle">Sandbox v1.8</span>
                 </div>
-            </div>
+            </button>
             
             <div class="sidebar-nav">
                 <button class="nav-btn active" onclick="switchTab('tab-pillar1')" id="btn-pillar1">
@@ -379,8 +403,7 @@
                     <button class="btn-action icon-only" onclick="toggleTheme()" id="btn_theme" title="Toggle Theme">
                         <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                     </button>
-                    <button class="btn-action flex-1" id="btn_sidebar_load" onclick="loadProfile()">Load</button>
-                    <button class="btn-action flex-1 save" onclick="saveProfile()" id="btn_save">Save</button>
+                    <button class="btn-action flex-1 save" onclick="saveProfile()" id="btn_save">Save Data</button>
                 </div>
                 <button class="btn-action reset" onclick="showResetModal()">
                     <svg viewBox="0 0 24 24" style="width:14px; height:14px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -395,16 +418,15 @@
         <div class="main-wrapper">
             
             <div class="mobile-header">
-                <div class="sidebar-brand" style="padding: 0; border: none;">
+                <button class="sidebar-brand" style="padding: 0; border: none; background: transparent; cursor: pointer; text-align: left; outline: none;" onclick="saveAndExit()">
                     <div class="mt-logo"><img src="logo.png" alt="MT Logo"></div>
                     <div class="brand-text">
                         <span class="brand-title">Finance 101</span>
                     </div>
-                </div>
+                </button>
                 <div class="action-row">
                     <button class="btn-action icon-only" onclick="undoAction()"><svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg></button>
                     <button class="btn-action icon-only" onclick="toggleTheme()"><svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button>
-                    <button class="btn-action icon-only" id="btn_mobile_load" onclick="loadProfile()"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg></button>
                     <button class="btn-action icon-only save" onclick="saveProfile()"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></button>
                     <button class="btn-action icon-only reset" onclick="showResetModal()"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                 </div>
