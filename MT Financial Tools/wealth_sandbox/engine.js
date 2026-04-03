@@ -83,6 +83,9 @@ async function loadCloudProfile() {
         }
     } catch (error) {
         console.error("Error loading cloud profile:", error);
+    } finally {
+        // Ensure the loading screen always drops, even if the user is brand new or an error occurs
+        dismissLoadingScreen();
     }
 }
 
@@ -122,6 +125,52 @@ function triggerAutoSave() {
     }, 1500); // Waits 1.5s after the user stops typing/sliding before firing the save
 }
 
+// ==========================================
+// 3.5 UI LIFECYCLE & EXIT LOGIC
+// ==========================================
+const ui = {
+    loadScreen: document.getElementById('loading-screen'),
+    loadProgress: document.getElementById('loading-progress')
+};
+
+// Start psychological loading instantly
+setTimeout(() => {
+    if(ui.loadProgress) ui.loadProgress.style.width = '92%';
+}, 100);
+
+// Call this function when Firebase finishes loading
+function dismissLoadingScreen() {
+    if(ui.loadProgress) ui.loadProgress.style.width = '100%';
+    setTimeout(() => {
+        if(ui.loadScreen) {
+            ui.loadScreen.style.opacity = '0';
+            setTimeout(() => ui.loadScreen.remove(), 400); // Strip from DOM
+        }
+    }, 500);
+}
+
+// Global expose for the HTML button
+window.saveAndExit = async () => {
+    // Re-create the loading screen overlay dynamically for the exit sequence
+    const exitOverlay = document.createElement('div');
+    exitOverlay.className = "fixed inset-0 z-[11000] bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center transition-opacity duration-300 opacity-0";
+    exitOverlay.innerHTML = `
+        <div class="flex flex-col items-center gap-5 w-56">
+            <img src="logo.png" class="w-20 h-20 animate-pulse drop-shadow-md object-contain">
+            <span class="text-[10px] font-bold text-brand uppercase tracking-widest animate-pulse">Saving & Exiting...</span>
+        </div>
+    `;
+    document.body.appendChild(exitOverlay);
+    
+    // Trigger fade in
+    setTimeout(() => exitOverlay.classList.remove('opacity-0'), 10);
+
+    // Force a final save, wait 800ms for psychological effect, then route out
+    await saveData();
+    setTimeout(() => {
+        window.location.href = '../index.html'; // Master dashboard redirect
+    }, 800);
+};
 
 // ==========================================
 // 4. MT WEALTH SANDBOX V1.1 - PURE PROJECTION ENGINE
