@@ -1,248 +1,481 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MT Wealth Sandbox v1.1</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: { 
-                        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'], 
-                        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Consolas', '"Courier New"', 'monospace'] 
-                    },
-                    colors: { brand: '#3E8E35', slate: { 850: '#151e2e', 900: '#0f172a' } }
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+// ==========================================
+// 1. FIREBASE CONFIGURATION & INITIALIZATION
+// ==========================================
+const firebaseConfig = {
+    apiKey: "AIzaSyDvANibal59STlmeA6jKwKOPc_6XFtq30A",
+    authDomain: "the-market-technician.firebaseapp.com",
+    projectId: "the-market-technician",
+    storageBucket: "the-market-technician.firebasestorage.app",
+    messagingSenderId: "182431949342",
+    appId: "1:182431949342:web:7f100110ac6617dc0c040f"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// Unique Database Key for this specific app module
+const DB_KEY = "wealthSandboxState";
+let currentUser = null;
+
+// ==========================================
+// 2. AUTH STATE OBSERVER
+// ==========================================
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        loadCloudProfile();
+    } else {
+        // Immediately redirect guest/unauthorized users back to master login
+        window.location.href = '../index.html';
+    }
+});
+
+// ==========================================
+// 3. CLOUD DATA HANDLING
+// ==========================================
+async function loadCloudProfile() {
+    try {
+        const docRef = doc(db, "users", currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+            const cloudData = docSnap.data();
+            
+            // Check if this specific app has saved data in the user's document
+            if (cloudData && cloudData[DB_KEY]) {
+                const state = cloudData[DB_KEY];
+                
+                // Inject cloud data into the UI elements safely
+                if(state.cap) els.cap.value = state.cap;
+                if(state.gross) els.gross.value = state.gross;
+                if(state.topup) els.topup.value = state.topup;
+                if(state.freq) els.freq.value = state.freq;
+                if(state.growth) els.growth.value = state.growth;
+                
+                if(state.age1) { els.age1.value = state.age1; els.valAge1.innerText = state.age1; }
+                if(state.age2) { els.age2.value = state.age2; els.valAge2.innerText = state.age2; }
+                if(state.age3) { els.age3.value = state.age3; els.valAge3.innerText = state.age3; }
+                
+                if(state.targetInc) els.targetInc.value = state.targetInc;
+                
+                // Restore DRIP vs Cash Out state
+                if(state.isDrip !== undefined) {
+                    isDrip = state.isDrip;
+                    if(isDrip) {
+                        els.toggleDrip.className = "flex-1 px-2 py-2 rounded bg-white dark:bg-slate-700 text-brand dark:text-green-400 text-xs font-bold shadow-sm transition-all";
+                        els.toggleCash.className = "flex-1 px-2 py-2 rounded text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-xs font-bold transition-all";
+                        els.desc.innerText = "Dividends automatically buy more shares (Exponential Growth).";
+                    } else {
+                        els.toggleCash.className = "flex-1 px-2 py-2 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold shadow-sm transition-all";
+                        els.toggleDrip.className = "flex-1 px-2 py-2 rounded text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-xs font-bold transition-all";
+                        els.desc.innerText = "Dividends are hoarded as a flat cash pile (Linear Growth).";
+                    }
                 }
+                
+                // Recalculate and redraw chart with the newly loaded cloud data
+                calculateMath(); 
             }
         }
-    </script>
+    } catch (error) {
+        console.error("Error loading cloud profile:", error);
+    } finally {
+        // Ensure the loading screen always drops, even if the user is brand new or an error occurs
+        dismissLoadingScreen();
+    }
+}
+
+async function saveData() {
+    if (!currentUser) return;
     
-    <style>
-        body { transition: background-color 0.3s, color 0.3s; overflow-x: hidden; }
-        .glass-panel { background: rgba(255, 255, 255, 0.85); border: 1px solid #cbd5e1; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); backdrop-filter: blur(12px); transition: background-color 0.3s, border-color 0.3s; }
-        .dark .glass-panel { background: rgba(30, 41, 59, 0.75); border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); backdrop-filter: blur(12px); }
-        .custom-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .dark .custom-scroll::-webkit-scrollbar-thumb { background: #475569; }
-        input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; margin: 8px 0; touch-action: pan-y; }
-        input[type=range]:focus { outline: none; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; background: #cbd5e1; border-radius: 3px; }
-        .dark input[type=range]::-webkit-slider-runnable-track { background: #334155; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: #3E8E35; cursor: pointer; margin-top: -9px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); transition: transform 0.1s; }
-        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
-        @media (max-width: 1024px) {
-            input[type=range] { pointer-events: none; }
-            input[type=range]::-webkit-slider-thumb { pointer-events: auto; }
-            input[type=range]::-moz-range-thumb { pointer-events: auto; }
+    // Bundle the current UI inputs into a clean state object
+    const appState = {
+        cap: els.cap.value,
+        gross: els.gross.value,
+        topup: els.topup.value,
+        freq: els.freq.value,
+        growth: els.growth.value,
+        age1: els.age1.value,
+        age2: els.age2.value,
+        age3: els.age3.value,
+        targetInc: els.targetInc.value,
+        isDrip: isDrip
+    };
+    
+    try {
+        // Silently push to Firestore using merge: true to protect other module data
+        await setDoc(doc(db, "users", currentUser.uid), {
+            [DB_KEY]: appState
+        }, { merge: true });
+    } catch (error) {
+        console.error("Error silently saving data:", error);
+    }
+}
+
+// Auto-save debounce logic to prevent spamming Firestore writes on slider drag
+let saveTimeout;
+function triggerAutoSave() {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+        saveData();
+    }, 1500); // Waits 1.5s after the user stops typing/sliding before firing the save
+}
+
+// ==========================================
+// 3.5 UI LIFECYCLE & EXIT LOGIC
+// ==========================================
+const ui = {
+    loadScreen: document.getElementById('loading-screen'),
+    loadProgress: document.getElementById('loading-progress')
+};
+
+// Start psychological loading instantly
+setTimeout(() => {
+    if(ui.loadProgress) ui.loadProgress.style.width = '92%';
+}, 100);
+
+// Call this function when Firebase finishes loading
+function dismissLoadingScreen() {
+    if(ui.loadProgress) ui.loadProgress.style.width = '100%';
+    setTimeout(() => {
+        if(ui.loadScreen) {
+            ui.loadScreen.style.opacity = '0';
+            setTimeout(() => ui.loadScreen.remove(), 400); // Strip from DOM
         }
-    </style>
-</head>
-<body class="min-h-screen w-full flex flex-col text-slate-900 dark:text-slate-50 bg-slate-50 dark:bg-slate-900 selection:bg-brand selection:text-white">
+    }, 500);
+}
 
-    <div id="loading-screen" class="fixed inset-0 z-[11000] bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center transition-opacity duration-[400ms]">
+// Global expose for the HTML button
+window.saveAndExit = async () => {
+    // Re-create the loading screen overlay dynamically for the exit sequence
+    const exitOverlay = document.createElement('div');
+    exitOverlay.className = "fixed inset-0 z-[11000] bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center transition-opacity duration-300 opacity-0";
+    exitOverlay.innerHTML = `
         <div class="flex flex-col items-center gap-5 w-56">
-            <img src="logo.png" alt="Loading..." class="w-20 h-20 animate-pulse drop-shadow-md object-contain">
-            <div class="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
-                <div id="loading-progress" class="h-full bg-brand transition-all duration-[800ms] ease-out w-0"></div>
-            </div>
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">Initializing Environment...</span>
+            <img src="logo.png" class="w-20 h-20 animate-pulse drop-shadow-md object-contain">
+            <span class="text-[10px] font-bold text-brand uppercase tracking-widest animate-pulse">Saving & Exiting...</span>
         </div>
-    </div>
+    `;
+    document.body.appendChild(exitOverlay);
+    
+    // Trigger fade in
+    setTimeout(() => exitOverlay.classList.remove('opacity-0'), 10);
 
-    <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden transition-colors duration-300">
-        <svg class="absolute top-[-10%] left-[-10%] w-[120vw] h-auto text-brand opacity-[0.10] dark:opacity-[0.05] transform rotate-[-5deg]" viewBox="0 0 1440 320" fill="currentColor" preserveAspectRatio="none"><path d="M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,149.3C672,149,768,203,864,224C960,245,1056,235,1152,208C1248,181,1344,139,1392,117.3L1440,96L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path></svg>
-    </div>
+    // Force a final save, wait 800ms for psychological effect, then route out
+    await saveData();
+    setTimeout(() => {
+        window.location.href = '../index.html'; // Master dashboard redirect
+    }, 800);
+};
 
-    <header class="w-full bg-white/70 dark:bg-slate-850/70 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 p-4 sticky top-0 z-50 shadow-sm flex justify-between items-center transition-colors">
-        <button onclick="saveAndExit()" class="flex items-center gap-3 text-left active:scale-95 transition-transform group outline-none">
-            <img src="logo.png" alt="MT Logo" class="w-10 h-10 object-contain drop-shadow-md group-hover:scale-105 transition-transform">
-            <div class="flex flex-col">
-                <h1 class="text-sm font-bold leading-none uppercase tracking-wider text-slate-800 dark:text-slate-100">Wealth Sandbox</h1>
-                <p class="text-[9px] text-brand font-mono font-bold tracking-widest mt-1">Projection Engine v1.1</p>
-            </div>
-        </button>
-        <button id="theme-toggle" class="p-2.5 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:bg-slate-300 dark:hover:bg-slate-700 active:scale-95 transition-all" title="Toggle Light/Dark Mode">
-            <svg class="w-4 h-4 hidden dark:block text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
-            <svg class="w-4 h-4 block dark:hidden text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-        </button>
-    </header>
+// ==========================================
+// 4. MT WEALTH SANDBOX V1.1 - PURE PROJECTION ENGINE
+// ==========================================
 
-    <div id="scam-alert" class="w-full bg-amber-500 text-slate-900 px-4 py-3 hidden flex-col sm:flex-row items-center justify-center gap-3 text-center sm:text-left z-40 relative shadow-md border-b-2 border-amber-600 transition-all">
-        <span class="text-2xl">⚠️</span>
-        <div>
-            <h4 class="font-black text-sm uppercase tracking-wider">High Risk / Unrealistic Expectation Alert</h4>
-            <p class="text-xs font-medium mt-0.5">Sustained yields >12% or growth >15% are exceedingly rare in public markets. If this is a private offering or crypto, it carries an extreme risk of total capital loss. Proceed with caution.</p>
-        </div>
-    </div>
+const DIV_TAX = 0.10;
+let isDrip = true;
+let myChart = null;
 
-    <main class="flex-1 w-full max-w-7xl mx-auto p-4 md:p-8 flex flex-col lg:flex-row gap-6 md:gap-8 relative z-10">
-        
-        <div class="w-full lg:w-4/12 flex flex-col gap-6">
+// UI Element References
+const els = {
+    cap: document.getElementById('in-capital'),
+    gross: document.getElementById('in-gross-yield'),
+    netOut: document.getElementById('out-net-yield'),
+    topup: document.getElementById('in-topup'),
+    freq: document.getElementById('in-freq'),
+    growth: document.getElementById('in-growth'),
+    age1: document.getElementById('slide-age1'),
+    valAge1: document.getElementById('val-age1'),
+    age2: document.getElementById('slide-age2'),
+    valAge2: document.getElementById('val-age2'),
+    age3: document.getElementById('slide-age3'),
+    valAge3: document.getElementById('val-age3'),
+    retireAge: document.getElementById('out-retire-age'),
+    targetInc: document.getElementById('in-target-inc'),
+    scamAlert: document.getElementById('scam-alert'),
+    toggleDrip: document.getElementById('toggle-drip'),
+    toggleCash: document.getElementById('toggle-cash'),
+    desc: document.getElementById('strategy-desc'),
+    outTarget: document.getElementById('out-target-fund'),
+    outReqTopup: document.getElementById('out-req-topup'),
+    outReqSubtext: document.getElementById('out-req-subtext'),
+    outProjFund: document.getElementById('out-proj-fund'),
+    outProjInc: document.getElementById('out-proj-inc'),
+    statusCard: document.getElementById('status-card'),
+    statusLine: document.getElementById('status-line'),
+    outPocket: document.getElementById('out-pocket'),
+    outFreeMoney: document.getElementById('out-free-money'),
+    narrative: document.getElementById('narrative-box')
+};
+
+// Utility: Parse commas to numbers
+const parseNum = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
+
+// Utility: Format Currency
+const formatPHP = (num) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num || 0);
+
+// Utility: Custom Massive Number Formatter for Chart Y-Axis
+const formatLargeNum = (num) => {
+    if (num < 1000) return num.toFixed(0);
+    if (num < 1e6) return (num / 1e3).toFixed(1) + 'k';
+    if (num < 1e9) return (num / 1e6).toFixed(1) + 'M';
+    if (num < 1e12) return (num / 1e9).toFixed(2) + 'B';
+    if (num < 1e15) return (num / 1e12).toFixed(2) + 'T';
+    if (num < 1e18) return (num / 1e15).toFixed(2) + 'Q';
+    return (num / 1e18).toFixed(2) + 'Qn'; // Quintillion
+};
+
+// Comma Input Formatter Logic
+document.querySelectorAll('.comma-input').forEach(input => {
+    input.addEventListener('input', (e) => {
+        let cursor = e.target.selectionStart;
+        let origLen = e.target.value.length;
+        let isNegative = e.target.value.startsWith('-');
+        let val = e.target.value.replace(/[^0-9.]/g, '');
+        let parts = val.split('.');
+        if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+        if (val.includes('.')) val = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + '.' + parts[1].substring(0, 4);
+        else val = val.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        e.target.value = isNegative ? '-' + val : val;
+        cursor += (e.target.value.length - origLen);
+        if (cursor >= 0) e.target.setSelectionRange(cursor, cursor);
+        calculateMath();
+    });
+});
+
+// Theme Toggle ensuring it triggers correctly
+document.getElementById('theme-toggle').addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    calculateMath(); // Redraws chart with correct colors
+});
+
+// Strategy Toggle (DRIP vs Cash)
+els.toggleDrip.addEventListener('click', (e) => {
+    isDrip = true;
+    els.toggleDrip.className = "flex-1 px-2 py-2 rounded bg-white dark:bg-slate-700 text-brand dark:text-green-400 text-xs font-bold shadow-sm transition-all";
+    els.toggleCash.className = "flex-1 px-2 py-2 rounded text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-xs font-bold transition-all";
+    els.desc.innerText = "Dividends automatically buy more shares (Exponential Growth).";
+    calculateMath();
+});
+
+els.toggleCash.addEventListener('click', (e) => {
+    isDrip = false;
+    els.toggleCash.className = "flex-1 px-2 py-2 rounded bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold shadow-sm transition-all";
+    els.toggleDrip.className = "flex-1 px-2 py-2 rounded text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-xs font-bold transition-all";
+    els.desc.innerText = "Dividends are hoarded as a flat cash pile (Linear Growth).";
+    calculateMath();
+});
+
+// Event Listeners for standard inputs
+[els.gross, els.growth].forEach(el => el.addEventListener('input', calculateMath));
+els.freq.addEventListener('change', calculateMath);
+
+// Age Sliders Logic (Prevent crossover)
+const updateAges = () => {
+    let a1 = parseInt(els.age1.value);
+    let a2 = parseInt(els.age2.value);
+    let a3 = parseInt(els.age3.value);
+    if (a2 < a1) { els.age2.value = a1; a2 = a1; }
+    if (a3 < a2) { els.age3.value = a2; a3 = a2; }
+    if (a3 < a1) { els.age3.value = a1; }
+    els.valAge1.innerText = a1; els.valAge2.innerText = a2; els.valAge3.innerText = a3;
+    els.retireAge.innerText = a3;
+    calculateMath();
+};
+[els.age1, els.age2, els.age3].forEach(el => el.addEventListener('input', updateAges));
+
+// Core Calculation Engine
+function calculateMath() {
+    // 1. Gather Inputs
+    const startCap = parseNum(els.cap.value);
+    const grossYield = parseNum(els.gross.value) / 100;
+    const netYield = grossYield * (1 - DIV_TAX);
+    const topupAmt = parseNum(els.topup.value);
+    const freq = parseInt(els.freq.value);
+    const capGrowth = parseNum(els.growth.value) / 100;
+    const targetInc = parseNum(els.targetInc.value);
+    const a1 = parseInt(els.age1.value);
+    const a2 = parseInt(els.age2.value);
+    const a3 = parseInt(els.age3.value);
+
+    // 2. Scam Detector logic
+    if (grossYield > 0.12 || capGrowth > 0.15) {
+        els.scamAlert.classList.remove('hidden');
+        els.scamAlert.classList.add('flex');
+    } else {
+        els.scamAlert.classList.add('hidden');
+        els.scamAlert.classList.remove('flex');
+    }
+
+    // 3. Math Init
+    els.netOut.innerText = (netYield * 100).toFixed(2) + '%';
+    
+    const targetFund = netYield > 0 ? (targetInc * 12) / netYield : 0;
+    const yearsTopup = a2 - a1; 
+    const yearsCoast = a3 - a2; 
+    const yearsTotal = a3 - a1;
+    
+    const totalRate = isDrip ? (netYield + capGrowth) : capGrowth; 
+    const moRate = Math.pow(1 + totalRate, 1/12) - 1;
+    const annualContrib = topupAmt * freq;
+
+    let reqPmt = 0; let isCoastFire = false; let shortfall = 0;
+
+    // Compute Required Top-up (if Target > 0)
+    if (yearsTotal > 0 && totalRate > 0) {
+        const fvDeployedBase = startCap * Math.pow(1 + totalRate, yearsTotal);
+        shortfall = targetFund - fvDeployedBase;
+        if (shortfall <= 0) {
+            isCoastFire = true; reqPmt = 0;
+        } else if (yearsTopup > 0) {
+            reqPmt = ((shortfall / Math.pow(1 + totalRate, yearsCoast)) * moRate) / (Math.pow(1 + moRate, yearsTopup * 12) - 1);
+        } else {
+            reqPmt = Infinity; 
+        }
+    }
+
+    // Simulation Loop
+    let labels = [], dataValue = [], dataInvested = [];
+    let shares = startCap / 1.0; 
+    let price = 1.0; 
+    let totalInvested = startCap;
+    let accumulatedCash = 0;
+
+    for (let t = 0; t <= yearsTotal; t++) {
+        labels.push('Age ' + (a1 + t));
+        if (t === 0) { 
+            dataValue.push(startCap); dataInvested.push(totalInvested); 
+        } else {
+            price *= (1 + capGrowth); // Price appreciates
+            if (t <= yearsTopup) { 
+                shares += (annualContrib / price); // Buy shares with topup
+                totalInvested += annualContrib; 
+            }
             
-            <div class="glass-panel p-6 rounded-2xl flex flex-col gap-5 border-t-4 border-t-brand">
-                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest">1. Starting Point</h3>
-                
-                <div>
-                    <label class="block text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold cursor-help" title="The initial lump sum amount you currently have invested.">Starting Capital <span class="text-[9px] text-slate-400">ⓘ</span></label>
-                    <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">₱</span>
-                        <input type="text" inputmode="decimal" id="in-capital" class="comma-input w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 pl-7 text-lg font-mono font-bold focus:ring-2 focus:ring-brand outline-none transition-all shadow-inner text-slate-900 dark:text-white" value="100,000">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold cursor-help" title="The gross annual dividend yield you expect to receive before taxes.">Gross Div Yield <span class="text-[9px] text-slate-400">ⓘ</span></label>
-                        <div class="relative">
-                            <input type="text" inputmode="decimal" id="in-gross-yield" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 pr-7 text-lg font-mono font-bold focus:ring-2 focus:ring-brand outline-none transition-all shadow-inner text-slate-900 dark:text-white" value="6.5">
-                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">%</span>
-                        </div>
-                    </div>
-                    <div class="bg-green-50 dark:bg-green-900/10 p-3 rounded-lg border border-green-200 dark:border-green-900/50 flex flex-col justify-center items-center text-center shadow-inner cursor-help" title="Your actual yield after the standard 10% Philippine dividend tax is deducted.">
-                        <span class="text-[9px] text-green-700 dark:text-green-500 font-bold uppercase tracking-wider mb-1 text-center leading-tight">Est. Net Yield <span class="text-[8px] text-green-600/50">ⓘ</span><br><span class="text-[8px] font-normal text-slate-400">(Less 10% Tax)</span></span>
-                        <span id="out-net-yield" class="text-xl font-mono font-black text-green-600 dark:text-green-400">5.85%</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="glass-panel p-6 rounded-2xl flex flex-col gap-6">
-                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest">2. Strategy & Growth</h3>
-
-                <div>
-                    <label class="block text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold cursor-help" title="Choose whether to reinvest dividends to buy more shares (exponential), or keep dividends as cash (linear).">Dividend Strategy <span class="text-[9px] text-slate-400">ⓘ</span></label>
-                    <div class="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-lg w-full border border-slate-300 dark:border-slate-700/50 shadow-inner">
-                        <button id="toggle-drip" class="flex-1 px-2 py-2 rounded bg-white dark:bg-slate-700 text-brand dark:text-green-400 text-xs font-bold shadow-sm active:scale-95 transition-all">DRIP (Reinvest)</button>
-                        <button id="toggle-cash" class="flex-1 px-2 py-2 rounded text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-xs font-bold active:scale-95 transition-all">Cash Out</button>
-                    </div>
-                    <p class="text-[9px] text-slate-500 mt-2 font-medium" id="strategy-desc">Dividends automatically buy more shares (Exponential Growth).</p>
-                </div>
-
-                <div class="h-px bg-slate-200 dark:bg-slate-700/50"></div>
-
-                <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="block text-[10px] text-slate-500 uppercase tracking-wider font-bold cursor-help" title="How much fresh capital you will add periodically.">Planned Top-Up <span class="text-[9px] text-slate-400">ⓘ</span></label>
-                        <select id="in-freq" class="bg-transparent border-none outline-none text-[10px] font-bold text-brand uppercase tracking-wider cursor-pointer appearance-none transition-colors text-right">
-                            <option value="12">Monthly</option>
-                            <option value="4">Quarterly</option>
-                            <option value="2">Semi-Annually</option>
-                            <option value="1">Annually</option>
-                        </select>
-                    </div>
-                    <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">₱</span>
-                        <input type="text" inputmode="decimal" id="in-topup" class="comma-input w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 pl-7 text-lg font-mono font-bold focus:ring-2 focus:ring-brand outline-none transition-all shadow-inner text-slate-900 dark:text-white" value="5,000">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold cursor-help" title="The estimated annual appreciation of the stock's market price.">Est. Capital Growth (Apprec.) <span class="text-[9px] text-slate-400">ⓘ</span></label>
-                    <div class="relative">
-                        <input type="text" inputmode="decimal" id="in-growth" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-3 pr-7 text-lg font-mono font-bold focus:ring-2 focus:ring-brand outline-none transition-all shadow-inner text-slate-900 dark:text-white" value="4.0">
-                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">%</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="glass-panel p-6 rounded-2xl flex flex-col gap-6">
-                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest">3. Timeline & Goals</h3>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <div class="flex justify-between text-[10px] text-slate-500 mb-2 font-bold cursor-help" title="Your age today."><span>Current Age <span class="text-[9px] text-slate-400">ⓘ</span></span> <span id="val-age1" class="font-mono font-bold text-slate-800 dark:text-slate-200">30</span></div>
-                        <input type="range" id="slide-age1" min="18" max="70" step="1" value="30">
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-[10px] text-slate-500 mb-2 font-bold cursor-help" title="The age you plan to stop adding new money (Coast FIRE)."><span>Stop Age <span class="text-[9px] text-slate-400">ⓘ</span></span> <span id="val-age2" class="font-mono font-bold text-purple-600 dark:text-purple-400">45</span></div>
-                        <input type="range" id="slide-age2" min="18" max="80" step="1" value="45">
-                    </div>
-                </div>
-                <div>
-                    <div class="flex justify-between text-[10px] text-slate-500 mb-2 font-bold cursor-help" title="The age you want to fully retire and live off the portfolio's income."><span>Retirement Age <span class="text-[9px] text-slate-400">ⓘ</span></span> <span id="val-age3" class="font-mono font-bold text-slate-800 dark:text-slate-200">65</span></div>
-                    <input type="range" id="slide-age3" min="40" max="100" step="1" value="65">
-                </div>
-
-                <div class="h-px bg-slate-200 dark:bg-slate-700/50"></div>
-
-                <div>
-                    <label class="block text-[10px] text-brand uppercase tracking-wider mb-2 font-bold cursor-help" title="The monthly passive income you want to achieve at Retirement Age.">Retirement Income Goal <span class="text-[9px] text-brand/50">ⓘ</span></label>
-                    <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-brand font-mono font-bold">₱</span>
-                        <input type="text" inputmode="decimal" id="in-target-inc" class="comma-input w-full bg-brand/5 border border-brand/30 rounded-lg p-3 pl-7 text-xl font-mono font-black text-brand focus:ring-2 focus:ring-brand outline-none transition-all shadow-inner" value="50,000">
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-        <div class="w-full lg:w-8/12 flex flex-col gap-6">
+            let dividend = (shares * price) * netYield; 
+            if (isDrip) {
+                shares += (dividend / price); // Exponential Reinvestment
+            } else {
+                accumulatedCash += dividend;  // Linear Cash Hoarding
+            }
             
-            <div class="glass-panel rounded-2xl p-4 sm:p-6 flex flex-col shadow-sm">
-                <div class="flex justify-between items-start mb-4">
-                    <h2 class="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Compound Trajectory</h2>
-                    <div class="flex items-center gap-3 text-[10px] font-mono font-bold">
-                        <span class="text-brand flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-brand"></div> Total Wealth</span>
-                        <span class="text-slate-500 flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-slate-400 border border-slate-500"></div> Out of Pocket</span>
-                    </div>
-                </div>
-                <div class="relative h-64 md:h-80 w-full cursor-crosshair" title="Hover over the lines to see exact projected values"><canvas id="reinvestChart"></canvas></div>
-            </div>
+            dataValue.push(accumulatedCash + (shares * price)); 
+            dataInvested.push(totalInvested);
+        }
+    }
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="glass-panel p-6 sm:p-8 rounded-2xl text-center border-t-4 border-t-blue-500 relative overflow-hidden flex flex-col justify-center">
-                    <h3 class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider mb-2 font-bold cursor-help" title="The exact portfolio size required to generate your income goal using the Net Yield.">Target Fund Needed <span class="text-[9px] text-slate-400">ⓘ</span></h3>
-                    <p class="text-3xl sm:text-4xl font-mono font-black text-slate-900 dark:text-white break-words" id="out-target-fund">₱0.00</p>
-                    <p class="text-[10px] text-slate-500 mt-2">To generate your monthly target via Net Yield.</p>
-                    <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
-                        <h3 class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 font-bold">Suggested Top-Up Required</h3>
-                        <p class="text-lg font-mono font-bold text-blue-600 dark:text-blue-400" id="out-req-topup">₱0.00 / mo</p>
-                        <p id="out-req-subtext" class="text-[9px] mt-1 leading-tight text-slate-500 font-medium"></p>
-                    </div>
-                </div>
-                
-                <div class="glass-panel p-6 sm:p-8 rounded-2xl text-center border-t-4 relative overflow-hidden flex flex-col justify-center transition-colors duration-300" id="status-card">
-                    <div class="absolute top-0 left-0 w-full h-1 bg-brand" id="status-line"></div>
-                    <h3 class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider mb-2 font-bold cursor-help" title="Your estimated total wealth at your chosen Retirement Age.">Projected Wealth at Age <span id="out-retire-age">65</span> <span class="text-[9px] text-slate-400">ⓘ</span></h3>
-                    <p class="text-3xl sm:text-4xl font-mono font-black text-brand break-words" id="out-proj-fund">₱0.00</p>
-                    <p class="text-[10px] text-slate-500 mt-2">Based on your exact inputs & timeline.</p>
-                    <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
-                        <h3 class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 font-bold cursor-help" title="The passive income generated by your Projected Wealth using the Net Yield.">Projected Monthly Income <span class="text-[9px] text-slate-400">ⓘ</span></h3>
-                        <p class="text-lg font-mono font-bold text-brand break-words" id="out-proj-inc">₱0.00 / mo</p>
-                    </div>
-                </div>
-            </div>
+    const projectedFinalDeployed = shares * price;
+    const projectedFinalTotal = accumulatedCash + projectedFinalDeployed;
+    const projectedIncome = (projectedFinalDeployed * netYield) / 12;
 
-            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
-                
-                <div class="md:col-span-5 glass-panel p-6 sm:p-8 rounded-2xl text-center border-t-4 border-t-emerald-500 relative overflow-hidden flex flex-col justify-center shadow-sm">
-                    <h3 class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider mb-4 font-bold">The Breakdown</h3>
-                    
-                    <div class="mb-4">
-                        <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 font-semibold cursor-help" title="The sum of your starting capital plus all the top-ups you plan to make.">Total Out-Of-Pocket <span class="text-[8px] text-slate-400">ⓘ</span></p>
-                        <p class="text-xl sm:text-2xl font-mono font-bold text-slate-700 dark:text-slate-300 break-words" id="out-pocket">₱0.00</p>
-                    </div>
-                    
-                    <div class="pt-4 border-t border-slate-200 dark:border-slate-700/50">
-                        <p class="text-[10px] text-brand uppercase tracking-wider mb-1 font-semibold flex items-center justify-center gap-1 cursor-help" title="The 'Free Money' generated purely by the market through dividends and capital growth over time.">Earned via Compounding ⓘ</p>
-                        <p class="text-2xl sm:text-3xl font-mono font-black text-brand break-words" id="out-free-money">₱0.00</p>
-                    </div>
-                </div>
+    updateUI({ targetFund, reqPmt, isCoastFire, projectedFinalTotal, projectedFinalDeployed, projectedIncome, totalInvested, a1, a2, a3, freqName: els.freq.options[els.freq.selectedIndex].text.toLowerCase(), topupAmt, startCap }, { labels, dataValue, dataInvested });
 
-                <div class="md:col-span-7 glass-panel rounded-2xl p-6 sm:p-8 bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-800/80 dark:to-slate-900 shadow-sm border-l-4 border-l-brand relative overflow-hidden flex flex-col justify-center">
-                    <h3 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3">Financial Summary</h3>
-                    <p class="text-sm leading-relaxed text-slate-700 dark:text-slate-300" id="narrative-box"></p>
-                </div>
-            </div>
+    // NEW: Trigger the silent auto-save to Firestore after calculations run
+    triggerAutoSave();
+}
 
-        </div>
-    </main>
-<script type="module" src="engine.js"></script>
-</body>
-</html>
+function updateUI(data, chartData) {
+    els.outTarget.innerText = formatPHP(data.targetFund);
+    els.outProjFund.innerText = formatPHP(data.projectedFinalTotal);
+    els.outProjInc.innerText = formatPHP(data.projectedIncome) + " / mo";
+
+    // Required Pmt Logic
+    if (data.isCoastFire || (data.targetFund === 0 && data.startCap > 0)) {
+        els.outReqTopup.innerText = "₱0 / mo";
+        els.outReqTopup.className = "text-lg font-mono font-bold text-brand transition-all";
+        els.outReqSubtext.innerText = "Goal fully covered by starting capital. Let it coast!";
+        els.outReqSubtext.className = "text-[9px] mt-1 leading-tight text-brand font-bold";
+    } else if (data.reqPmt === Infinity) {
+        els.outReqTopup.innerText = "Impossibility";
+        els.outReqTopup.className = "text-lg font-mono font-bold text-amber-500 transition-all";
+        els.outReqSubtext.innerText = "You must extend your Stop Age or add more Capital.";
+        els.outReqSubtext.className = "text-[9px] mt-1 leading-tight text-amber-500 font-bold";
+    } else if (data.topupAmt >= data.reqPmt) {
+        els.outReqTopup.innerText = formatPHP(data.reqPmt) + " / mo";
+        els.outReqTopup.className = "text-lg font-mono font-bold text-brand transition-all";
+        els.outReqSubtext.innerText = `You only need ${formatPHP(data.reqPmt)}! Your plan puts you ahead of schedule.`;
+        els.outReqSubtext.className = "text-[9px] mt-1 leading-tight text-brand font-bold";
+    } else {
+        els.outReqTopup.innerText = formatPHP(data.reqPmt) + " / mo";
+        els.outReqTopup.className = "text-lg font-mono font-bold text-blue-600 dark:text-blue-400 transition-all";
+        els.outReqSubtext.innerText = "You are falling short. Increase top-ups or extend your timeline.";
+        els.outReqSubtext.className = "text-[9px] mt-1 leading-tight text-slate-500 dark:text-slate-400";
+    }
+
+    // Victory Card CSS
+    if (data.projectedFinalDeployed >= data.targetFund && data.targetFund > 0) {
+        els.outProjFund.className = "text-3xl sm:text-4xl font-mono font-black text-brand break-words transition-colors";
+        els.outProjInc.className = "text-lg font-mono font-bold text-brand break-words transition-colors";
+        els.statusCard.className = "glass-panel p-6 sm:p-8 rounded-2xl text-center border-t-4 border-t-brand transition-colors relative overflow-hidden flex flex-col justify-center duration-300";
+        els.statusLine.className = "absolute top-0 left-0 w-full h-1 bg-brand";
+    } else {
+        els.outProjFund.className = "text-3xl sm:text-4xl font-mono font-black text-amber-500 break-words transition-colors";
+        els.outProjInc.className = "text-lg font-mono font-bold text-amber-500 break-words transition-colors";
+        els.statusCard.className = "glass-panel p-6 sm:p-8 rounded-2xl text-center border-t-4 border-t-amber-500 transition-colors relative overflow-hidden flex flex-col justify-center duration-300";
+        els.statusLine.className = "absolute top-0 left-0 w-full h-1 bg-amber-500";
+    }
+
+    // Free Money Metric
+    els.outPocket.innerText = formatPHP(data.totalInvested);
+    const freeMoney = data.projectedFinalTotal - data.totalInvested;
+    els.outFreeMoney.innerText = "+" + formatPHP(Math.max(0, freeMoney));
+
+    // Narrative
+    const strategyLabel = isDrip ? "Exponential DRIP" : "Linear Cash Hoarding";
+    els.narrative.innerHTML = `
+        Starting at age <span class="font-bold border-b border-brand/30">${data.a1}</span> with your initial capital of <span class="font-mono font-bold text-brand">${formatPHP(data.startCap)}</span>, if you top-up <span class="font-mono font-bold text-brand">${formatPHP(data.topupAmt)}</span> ${data.freqName} until age <span class="font-bold border-b border-brand/30">${data.a2}</span>, your total out-of-pocket investment will be <span class="font-mono font-bold">${formatPHP(data.totalInvested)}</span>.<br><br>
+        Letting it coast using an <span class="font-bold italic">${strategyLabel}</span> strategy for another <span class="font-bold">${data.a3 - data.a2}</span> years, by age <span class="font-bold border-b border-brand/30">${data.a3}</span> your portfolio is projected to reach <span class="font-mono font-bold text-brand text-lg">${formatPHP(data.projectedFinalTotal)}</span>.<br><br>
+        Living off the dividends generates <span class="font-mono font-bold text-brand text-lg">${formatPHP(data.projectedIncome)}</span> per month (via Est. Net Yield), which is <span class="font-bold underline decoration-brand decoration-2">${data.projectedFinalDeployed >= data.targetFund ? 'above' : 'short of'}</span> your original goal!
+    `;
+
+    drawChart(chartData);
+}
+
+function drawChart(chartData) {
+    const ctx = document.getElementById('reinvestChart').getContext('2d');
+    if (myChart) myChart.destroy();
+    const isDark = document.documentElement.classList.contains('dark');
+    
+    myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                { label: 'Total Value', data: chartData.dataValue, borderColor: '#3E8E35', backgroundColor: 'rgba(62, 142, 53, 0.1)', borderWidth: 3, fill: true, tension: 0.3, pointRadius: 0 },
+                { label: 'Out-of-Pocket', data: chartData.dataInvested, borderColor: isDark ? '#475569' : '#9ca3af', borderDash: [5, 5], borderWidth: 2, fill: false, tension: 0.1, pointRadius: 0 }
+            ]
+        },
+        options: {
+            responsive: true, 
+            maintainAspectRatio: false, 
+            interaction: { mode: 'index', intersect: false }, 
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + formatPHP(context.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: { 
+                x: { grid: { display: false }, ticks: { color: isDark ? '#94a3b8' : '#64748b' } }, 
+                y: { 
+                    grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }, 
+                    ticks: { 
+                        color: isDark ? '#94a3b8' : '#64748b', 
+                        callback: function(value) { return '₱' + formatLargeNum(value); } 
+                    } 
+                } 
+            }
+        }
+    });
+}
+
+// Initialize
+calculateMath();
