@@ -74,7 +74,7 @@
             --wave-opacity: 0.02;
         }
 
-        /* UPDATED: Dark Mode Autofill Overrides */
+        /* Dark Mode Autofill Overrides */
         [data-theme="dark"] input:-webkit-autofill,
         [data-theme="dark"] input:-webkit-autofill:hover,
         [data-theme="dark"] input:-webkit-autofill:focus,
@@ -123,7 +123,7 @@
             flex-direction: column;
             align-items: center;
             gap: 20px;
-            width: 320px; /* Widened to prevent longer text from wrapping/jerking */
+            width: 320px;
             margin: 0 auto;
         }
 
@@ -203,7 +203,7 @@
         .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
         .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
 
-        /* --- UI OVERHAUL CSS: PASSWORD WRAPPER, CRISP CHECKBOX, TOGGLE --- */
+        /* UI OVERHAUL CSS: PASSWORD WRAPPER, CRISP CHECKBOX, TOGGLE */
         .password-wrapper {
             position: relative;
             width: 100%;
@@ -254,7 +254,6 @@
         
         .forgot-password:hover { opacity: 0.8; text-decoration: underline; }
 
-        /* CRISP CHECKBOX FIX: Stripped native styling completely */
         .legal-check {
             display: flex;
             align-items: flex-start;
@@ -265,7 +264,7 @@
             margin-top: 4px;
             line-height: 1.4;
             cursor: pointer;
-            user-select: none; /* Prevent text highlighting */
+            user-select: none;
         }
 
         .legal-check input {
@@ -284,12 +283,11 @@
             transition: all 0.15s ease;
         }
 
-        /* PERFECTED: Thick SVG Green Checkmark */
         .legal-check input:checked {
             background-color: var(--input-bg); 
             border-color: var(--brand-green); 
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2363AC2A' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
-            background-size: 85%; /* Scales the checkmark perfectly inside the box */
+            background-size: 85%;
             background-position: center;
             background-repeat: no-repeat;
         }
@@ -300,7 +298,6 @@
             font-weight: 600;
         }
 
-        /* Auth Mode Toggle Link */
         .auth-toggle-container {
             font-size: 14px;
             color: var(--text-muted);
@@ -320,8 +317,6 @@
             opacity: 0.8;
             text-decoration: underline;
         }
-
-        /* --- END UI OVERHAUL CSS --- */
 
         .paywall-box {
             background-color: var(--input-bg);
@@ -665,6 +660,18 @@
                         <p>Map out your net worth, track your monthly budget, and generate your personalized financial action plan.</p>
                     </div>
                 </a>
+
+                <a href="more.html" class="app-card" style="grid-column: 1 / -1; background-color: var(--board-bg); border-color: var(--brand-green);">
+                    <div class="app-card-icon" style="background-color: var(--panel-bg);">
+                        <svg style="width: 28px; height: 28px; color: var(--brand-green);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                    </div>
+                    <div class="app-card-content">
+                        <h3>More from The Market Technician</h3>
+                        <p>Explore our eBook library, discover upcoming crypto platform updates, and access additional trading resources.</p>
+                    </div>
+                </a>
             </div>
 
             <div style="display: flex; flex-direction: column; align-items: center;">
@@ -693,13 +700,11 @@
     </div>
 
     <script>
-        // NEW: Theme Toggle Logic (Now saves to Local Storage)
         const themeBtn = document.getElementById('theme-toggle-btn');
         const htmlElement = document.documentElement;
         const sunIcon = document.getElementById('sun-icon');
         const moonIcon = document.getElementById('moon-icon');
 
-        // Set the correct icon on initial load
         if (htmlElement.getAttribute('data-theme') === 'dark') {
             moonIcon.classList.add('hidden');
             sunIcon.classList.remove('hidden');
@@ -710,7 +715,7 @@
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             
             htmlElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('mt-theme', newTheme); // Save to memory!
+            localStorage.setItem('mt-theme', newTheme); 
 
             if (newTheme === 'dark') {
                 moonIcon.classList.add('hidden');
@@ -721,7 +726,6 @@
             }
         });
 
-        // Eye Icon Toggle Logic
         const togglePasswordBtn = document.getElementById('toggle-password-btn');
         const passwordInput = document.getElementById('password');
         const eyeIconClosed = document.getElementById('eye-icon-closed');
