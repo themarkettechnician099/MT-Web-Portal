@@ -8,8 +8,8 @@ import {
     signOut,
     sendPasswordResetEmail,
     deleteUser,
-    EmailAuthProvider, // NEW: Required to verify password before deletion
-    reauthenticateWithCredential // NEW: Required to verify password before deletion
+    EmailAuthProvider, 
+    reauthenticateWithCredential 
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -50,9 +50,15 @@ const logoutBtn = document.getElementById('logout-btn');
 const paywallLogoutBtn = document.getElementById('paywall-logout-btn'); 
 const userEmailDisplay = document.getElementById('user-email');
 const errorMessage = document.getElementById('error-message');
-const legalCheckbox = document.getElementById('legal-checkbox'); 
 const forgotPasswordLink = document.getElementById('forgot-password-link'); 
 const deleteAccountBtn = document.getElementById('delete-account-btn'); 
+
+// NEW: UX Toggle Elements
+const authTitle = document.getElementById('auth-title');
+const authToggleLink = document.getElementById('auth-toggle-link');
+const authToggleText = document.getElementById('auth-toggle-text');
+const legalCheckContainer = document.getElementById('legal-check-container');
+const legalCheckbox = document.getElementById('legal-checkbox'); 
 
 // NEW: Delete Modal Elements
 const deleteModalOverlay = document.getElementById('delete-modal-overlay');
@@ -60,7 +66,36 @@ const deletePasswordConfirm = document.getElementById('delete-password-confirm')
 const deleteErrorMessage = document.getElementById('delete-error-message');
 const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
 
-// 5. Monitor Auth State & Enforce Paywall (Phase 2 & Phase 4)
+// --- 4.5 UX TOGGLE LOGIC ---
+let isSignUpMode = false;
+
+authToggleLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    isSignUpMode = !isSignUpMode;
+    errorMessage.textContent = ""; // Clear errors on flip
+
+    if (isSignUpMode) {
+        // Switch to Sign Up View
+        authTitle.textContent = "Create your account.";
+        loginBtn.classList.add('hidden');
+        forgotPasswordLink.classList.add('hidden');
+        signupBtn.classList.remove('hidden');
+        legalCheckContainer.classList.remove('hidden');
+        authToggleText.textContent = "Already have an account?";
+        authToggleLink.textContent = "Log In";
+    } else {
+        // Switch to Sign In View
+        authTitle.textContent = "Sign in to access your account.";
+        signupBtn.classList.add('hidden');
+        legalCheckContainer.classList.add('hidden');
+        loginBtn.classList.remove('hidden');
+        forgotPasswordLink.classList.remove('hidden');
+        authToggleText.textContent = "Don't have an account?";
+        authToggleLink.textContent = "Sign Up";
+    }
+});
+
+// 5. Monitor Auth State & Enforce Paywall
 onAuthStateChanged(auth, async (user) => { 
     
     if(loadingProgress) loadingProgress.style.width = '100%';
@@ -108,15 +143,27 @@ onAuthStateChanged(auth, async (user) => {
         dashboardSection.classList.add('hidden');
         paywallSection.classList.add('hidden');
         userEmailDisplay.textContent = "";
+        
+        // FIX: Reset stuck buttons and wipe password field on logout
+        loginBtn.textContent = "Sign In";
+        signupBtn.textContent = "Create Account";
+        passwordInput.value = "";
     }
 });
 
-// 6. Handle Login
+// 6. Handle Form Submission (Smartly routes Login vs Signup based on mode)
 authForm.addEventListener('submit', (e) => {
     e.preventDefault(); 
     errorMessage.textContent = ""; 
     errorMessage.style.color = "var(--danger-red)"; 
     
+    // If they press "Enter" while in Sign Up mode, trigger the signup logic instead!
+    if (isSignUpMode) {
+        signupBtn.click();
+        return;
+    }
+    
+    // Standard Login Logic
     const originalText = loginBtn.textContent;
     loginBtn.textContent = "Authenticating...";
     
@@ -179,7 +226,7 @@ forgotPasswordLink.addEventListener('click', (e) => {
     sendPasswordResetEmail(auth, email)
         .then(() => {
             errorMessage.style.color = "var(--brand-green)"; 
-            errorMessage.textContent = "Password reset email sent! Please check your inbox.";
+            errorMessage.textContent = "Password reset email sent! Please check your inbox or spam folder.";
         })
         .catch((error) => {
             errorMessage.style.color = "var(--danger-red)";
@@ -197,14 +244,12 @@ paywallLogoutBtn.addEventListener('click', () => {
 });
 
 // 10. Handle Delete Account (NUCLEAR LOCK)
-// Step 1: Trigger the Modal
 deleteAccountBtn.addEventListener('click', () => {
-    deleteErrorMessage.textContent = ""; // Clear any old errors
-    deletePasswordConfirm.value = ""; // Clear old password inputs
-    deleteModalOverlay.classList.add('active'); // Turn on the red atmosphere
+    deleteErrorMessage.textContent = ""; 
+    deletePasswordConfirm.value = ""; 
+    deleteModalOverlay.classList.add('active'); 
 });
 
-// Step 2: Process the Deletion
 confirmDeleteBtn.addEventListener('click', async () => {
     const user = auth.currentUser;
     const password = deletePasswordConfirm.value;
@@ -216,32 +261,23 @@ confirmDeleteBtn.addEventListener('click', async () => {
         return;
     }
 
-    // UI Feedback
     const originalText = confirmDeleteBtn.textContent;
     confirmDeleteBtn.textContent = "Erasing Data...";
 
     try {
-        // Build the security credential using their current email and the password they just typed
         const credential = EmailAuthProvider.credential(user.email, password);
-
-        // Force Firebase to verify the password against their servers
         await reauthenticateWithCredential(user, credential);
-
-        // If the code reaches this line, the password was a perfect match. Incinerate the account.
         await deleteUser(user);
 
-        // Clean up the UI
         deleteModalOverlay.classList.remove('active');
         alert("Your account and all associated data have been permanently erased.");
-        // The onAuthStateChanged listener will automatically detect they are gone and kick them to the login screen.
 
     } catch (error) {
-        // If the code jumps here, the password was wrong (or another error occurred)
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
             deleteErrorMessage.textContent = "Incorrect password. Deletion aborted.";
         } else {
             deleteErrorMessage.textContent = "An error occurred: " + error.message;
         }
-        confirmDeleteBtn.textContent = originalText; // Reset button text
+        confirmDeleteBtn.textContent = originalText; 
     }
 });
