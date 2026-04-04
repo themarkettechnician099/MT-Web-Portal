@@ -255,6 +255,103 @@
         .btn-text-danger:hover {
             opacity: 0.7;
         }
+
+        /* --- NEW CSS: NUCLEAR DELETE MODAL --- */
+        #delete-modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 12000;
+            background-color: rgba(239, 68, 68, 0.15); /* Transparent Red Atmosphere */
+            backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        #delete-modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .delete-modal-box {
+            background: var(--panel-bg);
+            padding: 40px;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 420px;
+            box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.3), var(--panel-shadow);
+            border: 2px solid var(--danger-red);
+            text-align: center;
+            transform: scale(0.95);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #delete-modal-overlay.active .delete-modal-box {
+            transform: scale(1);
+        }
+
+        .delete-modal-box h2 {
+            color: var(--danger-red);
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .delete-modal-box p {
+            font-size: 14px;
+            margin-bottom: 24px;
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        .delete-btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn-cancel {
+            background-color: var(--input-bg);
+            color: var(--text-main);
+            flex: 1;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            box-shadow: var(--button-shadow);
+            transition: all 0.2s ease;
+        }
+
+        .btn-cancel:active {
+            box-shadow: var(--button-pressed-shadow);
+            transform: translateY(2px);
+        }
+
+        .btn-confirm-delete {
+            background-color: var(--danger-red);
+            color: white;
+            flex: 1;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            box-shadow: 4px 4px 8px rgba(239, 68, 68, 0.3), -4px -4px 8px rgba(255,255,255,0.05);
+            transition: all 0.2s ease;
+        }
+
+        .btn-confirm-delete:active {
+            box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2);
+            transform: translateY(2px);
+        }
         /* --- END NEW CSS --- */
 
         /* The Physical Panel */
@@ -550,10 +647,26 @@
 
             <div style="display: flex; flex-direction: column; align-items: center;">
                 <button id="logout-btn" class="btn-danger">Disconnect / Log Out</button>
-                
                 <button id="delete-account-btn" class="btn-text-danger">Delete Account Permanently</button>
             </div>
+        </div>
+    </div>
+
+    <div id="delete-modal-overlay">
+        <div class="delete-modal-box">
+            <svg style="width: 48px; height: 48px; color: var(--danger-red); margin: 0 auto 16px auto;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <h2>Nuclear Alert</h2>
+            <p>Are you absolutely sure you want to permanently delete your account? This will erase your VIP access and all your saved portfolio data.<br><br><strong style="color: var(--text-main);">This cannot be undone.</strong></p>
             
+            <input type="password" id="delete-password-confirm" placeholder="Enter your password to confirm" required>
+            <div id="delete-error-message" style="color: var(--danger-red); font-size: 12px; margin-top: 8px; min-height: 16px; font-weight: 600;"></div>
+            
+            <div class="delete-btn-group">
+                <button id="cancel-delete-btn" class="btn-cancel" onclick="document.getElementById('delete-modal-overlay').classList.remove('active')">Cancel</button>
+                <button id="confirm-delete-btn" class="btn-confirm-delete">Erase Data</button>
+            </div>
         </div>
     </div>
 
