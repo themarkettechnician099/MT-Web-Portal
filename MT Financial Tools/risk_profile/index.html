@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MT Risk Assessment Sandbox v1.6</title>
+
+    <script>
+        // 1. Read the global memory saved by the main portal
+        const savedTheme = localStorage.getItem('mt-theme') || 'light';
+        
+        // 2. Apply for standard CSS apps (Portal, Legal pages)
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        // 3. Apply for Tailwind CSS apps (Trading Sandbox, etc.)
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
