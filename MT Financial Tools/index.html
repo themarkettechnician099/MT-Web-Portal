@@ -572,14 +572,16 @@
                 <img src="logo.png" alt="Market Technician Logo" class="brand-logo" onerror="this.style.display='none'">
             </button>
             
-            <h2 style="color: var(--text-main); margin-top: 0; margin-bottom: 8px;">Access Restricted</h2>
-            <p>Your subscription is pending or has expired.</p>
+            <h2 style="color: var(--text-main); margin-top: 0; margin-bottom: 8px;">Get Your Premium Access</h2>
+            <p>Your free account access has ended.</p>
             
             <div class="paywall-box">
-                <strong style="color: var(--text-main);">To activate your VIP access:</strong><br><br>
-                1. Send payment via GCash or Bank Transfer.<br>
-                2. Email your receipt to: <strong>admin@the-market-technician.com</strong><br>
-                3. Your account will be manually unlocked within 24 hours.
+                <strong style="color: var(--text-main);">To activate your Premium Access:</strong><br><br>
+                1. Click this link and register in this form: <br>
+                <a href="https://forms.gle/rjMKNkyH8aqtMqVA9" target="_blank" style="color: var(--brand-green); font-weight: 700; text-decoration: none; display: inline-block; margin-bottom: 4px;">https://forms.gle/rjMKNkyH8aqtMqVA9</a><br>
+                2. Using your banking app (GCash or any payment app), scan the QR code in the form.<br>
+                3. Attach the proof of payment and fill up the form.<br>
+                4. Your account will be unlocked within 24 hours.
             </div>
 
             <button id="paywall-logout-btn" class="btn-secondary">Log Out</button>
@@ -592,6 +594,17 @@
             
             <p>Active profile: <strong id="user-email"></strong></p>
             
+            <div id="upgrade-banner" class="paywall-box hidden" style="border-color: var(--brand-green); background-color: rgba(99, 172, 42, 0.05); margin-top: -10px;">
+                <h3 style="color: var(--brand-green); margin-top: 0; margin-bottom: 8px; font-size: 16px;">Your Free Access Starts Now</h3>
+                <p style="margin-bottom: 16px; font-size: 14px;">You have 5 days to try the free features of the app.</p>
+                <strong style="color: var(--text-main);">Get Your Premium Access:</strong><br><br>
+                1. Click this link and register in this form: <br>
+                <a href="https://forms.gle/rjMKNkyH8aqtMqVA9" target="_blank" style="color: var(--brand-green); font-weight: 700; text-decoration: none; display: inline-block; margin-bottom: 4px;">https://forms.gle/rjMKNkyH8aqtMqVA9</a><br>
+                2. Using your banking app (GCash or any payment app), scan the QR code in the form.<br>
+                3. Attach the proof of payment and fill up the form.<br>
+                4. Your account will be unlocked within 24 hours.
+            </div>
+            
             <div class="app-grid">
                 <a href="wealth_sandbox/index.html" class="app-card">
                     <div class="app-card-icon">
@@ -603,7 +616,7 @@
                     </div>
                 </a>
                 
-                <a href="risk_profile/index.html" class="app-card">
+                <a href="risk_profile/index.html" class="app-card premium-app">
                     <div class="app-card-icon">
                         <img src="icon_risk_profile.png" alt="Risk Profile" onerror="this.style.display='none'">
                     </div>
@@ -613,7 +626,7 @@
                     </div>
                 </a>
                 
-                <a href="trading_sandbox/index.html" class="app-card">
+                <a href="trading_sandbox/index.html" class="app-card premium-app">
                     <div class="app-card-icon">
                         <img src="icon_trading_sandbox.png" alt="Trading Sandbox" onerror="this.style.display='none'">
                     </div>
@@ -633,7 +646,7 @@
                     </div>
                 </a>
                 
-                <a href="dividend_sandbox/index.html" class="app-card">
+                <a href="dividend_sandbox/index.html" class="app-card premium-app">
                     <div class="app-card-icon">
                         <img src="icon_dividend_sandbox.png" alt="Dividend Sandbox" onerror="this.style.display='none'">
                     </div>
