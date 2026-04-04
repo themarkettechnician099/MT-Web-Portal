@@ -27,10 +27,25 @@ const firebaseConfig = {
 // --- LOADING SCREEN LOGIC (Phase 1) ---
 const loadingScreen = document.getElementById('loading-screen');
 const loadingProgress = document.getElementById('loading-progress');
+const loadingTextDisplay = document.getElementById('loading-text'); // NEW
 
 setTimeout(() => {
     if(loadingProgress) loadingProgress.style.width = '92%';
 }, 50);
+
+// NEW: Function to dynamically drop the curtain during Auth events
+function dropCurtain(message) {
+    if(loadingTextDisplay) loadingTextDisplay.textContent = message;
+    if(loadingScreen) loadingScreen.classList.remove('fade-out');
+    if(loadingProgress) {
+        loadingProgress.style.transition = 'none'; // Reset bar instantly
+        loadingProgress.style.width = '0%';
+        setTimeout(() => {
+            loadingProgress.style.transition = 'width 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
+            loadingProgress.style.width = '85%';
+        }, 50);
+    }
+}
 
 // 3. Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -163,17 +178,17 @@ authForm.addEventListener('submit', (e) => {
         return;
     }
     
-    // Standard Login Logic
-    const originalText = loginBtn.textContent;
-    loginBtn.textContent = "Authenticating...";
-    
     const email = emailInput.value;
     const password = passwordInput.value;
 
+    // NEW: Drop the curtain immediately!
+    dropCurtain("Authenticating Credentials...");
+
     signInWithEmailAndPassword(auth, email, password)
         .catch((error) => {
+            // Pull the curtain back up on fail
+            if(loadingScreen) loadingScreen.classList.add('fade-out');
             errorMessage.textContent = "Invalid email or password.";
-            loginBtn.textContent = originalText; 
         });
 });
 
@@ -195,11 +210,13 @@ signupBtn.addEventListener('click', () => {
         return;
     }
 
-    const originalText = signupBtn.textContent;
-    signupBtn.textContent = "Creating Account...";
+    // NEW: Drop the curtain immediately!
+    dropCurtain("Provisioning Secure Workspace...");
 
     createUserWithEmailAndPassword(auth, email, password)
         .catch((error) => {
+            // Pull the curtain back up on fail
+            if(loadingScreen) loadingScreen.classList.add('fade-out');
             if(error.code === 'auth/email-already-in-use') {
                 errorMessage.textContent = "This email is already registered. Please sign in.";
             } else if (error.code === 'auth/weak-password') {
@@ -207,7 +224,6 @@ signupBtn.addEventListener('click', () => {
             } else {
                 errorMessage.textContent = error.message;
             }
-            signupBtn.textContent = originalText; 
         });
 });
 
