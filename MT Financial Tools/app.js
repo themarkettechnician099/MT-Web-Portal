@@ -1,726 +1,308 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MT Financial Tools | Portal</title>
+// 1. Import Firebase functions directly from the CDN
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { 
+    getAuth, 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    onAuthStateChanged, 
+    signOut,
+    sendPasswordResetEmail,
+    deleteUser,
+    EmailAuthProvider, // NEW: Required to verify password before deletion
+    reauthenticateWithCredential // NEW: Required to verify password before deletion
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+// 2. YOUR FIREBASE CONFIGURATION
+const firebaseConfig = {
+  apiKey: "AIzaSyDvANibal59STlmeA6jKwKOPc_6XFtq30A",
+  authDomain: "the-market-technician.firebaseapp.com",
+  projectId: "the-market-technician",
+  storageBucket: "the-market-technician.firebasestorage.app",
+  messagingSenderId: "182431949342",
+  appId: "1:182431949342:web:7f100110ac6617dc0c040f"
+};
+
+// --- LOADING SCREEN LOGIC (Phase 1) ---
+const loadingScreen = document.getElementById('loading-screen');
+const loadingProgress = document.getElementById('loading-progress');
+const loadingTextDisplay = document.getElementById('loading-text'); // NEW
+
+setTimeout(() => {
+    if(loadingProgress) loadingProgress.style.width = '92%';
+}, 50);
+
+// NEW: Function to dynamically drop the curtain during Auth events
+function dropCurtain(message) {
+    if(loadingTextDisplay) loadingTextDisplay.textContent = message;
+    if(loadingScreen) loadingScreen.classList.remove('fade-out');
+    if(loadingProgress) {
+        loadingProgress.style.transition = 'none'; // Reset bar instantly
+        loadingProgress.style.width = '0%';
+        setTimeout(() => {
+            loadingProgress.style.transition = 'width 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
+            loadingProgress.style.width = '85%';
+        }, 50);
+    }
+}
+
+// 3. Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app); 
+
+// 4. Get UI Elements
+const authSection = document.getElementById('auth-section');
+const dashboardSection = document.getElementById('dashboard-section');
+const paywallSection = document.getElementById('paywall-section'); 
+const authForm = document.getElementById('auth-form');
+const emailInput = document.getElementById('email');
+const passwordInput = document.getElementById('password');
+const loginBtn = document.getElementById('login-btn');
+const signupBtn = document.getElementById('signup-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const paywallLogoutBtn = document.getElementById('paywall-logout-btn'); 
+const userEmailDisplay = document.getElementById('user-email');
+const errorMessage = document.getElementById('error-message');
+const forgotPasswordLink = document.getElementById('forgot-password-link'); 
+const deleteAccountBtn = document.getElementById('delete-account-btn'); 
+
+// NEW: UX Toggle Elements
+const authTitle = document.getElementById('auth-title');
+const authToggleLink = document.getElementById('auth-toggle-link');
+const authToggleText = document.getElementById('auth-toggle-text');
+const legalCheckContainer = document.getElementById('legal-check-container');
+const legalCheckbox = document.getElementById('legal-checkbox'); 
+
+// Delete Modal Elements
+const deleteModalOverlay = document.getElementById('delete-modal-overlay');
+const deletePasswordConfirm = document.getElementById('delete-password-confirm');
+const deleteErrorMessage = document.getElementById('delete-error-message');
+const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+// --- 4.5 UX TOGGLE LOGIC ---
+let isSignUpMode = false;
+
+authToggleLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    isSignUpMode = !isSignUpMode;
+    errorMessage.textContent = ""; 
+
+    if (isSignUpMode) {
+        authTitle.textContent = "Create your account.";
+        loginBtn.classList.add('hidden');
+        forgotPasswordLink.classList.add('hidden');
+        signupBtn.classList.remove('hidden');
+        legalCheckContainer.classList.remove('hidden');
+        authToggleText.textContent = "Already have an account?";
+        authToggleLink.textContent = "Log In";
+    } else {
+        authTitle.textContent = "Sign in to access your account.";
+        signupBtn.classList.add('hidden');
+        legalCheckContainer.classList.add('hidden');
+        loginBtn.classList.remove('hidden');
+        forgotPasswordLink.classList.remove('hidden');
+        authToggleText.textContent = "Don't have an account?";
+        authToggleLink.textContent = "Sign Up";
+    }
+});
+
+// 5. Monitor Auth State & Enforce Paywall (Phase 2 & Phase 4)
+onAuthStateChanged(auth, async (user) => { 
     
-    <script>
-        const savedTheme = localStorage.getItem('mt-theme') || 'light';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-    </script>
-
-    <style>
-        /* Import Inter Font */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-        /* CSS Variables for Light/Dark Mode (Tactile Command Center) */
-        :root {
-            --board-bg: #e2e8f0; 
-            --panel-bg: #f1f5f9; 
-            --text-main: #1e293b;
-            --text-muted: #64748b;
-            --border-color: #cbd5e1;
-            --input-bg: #e2e8f0;
-            
-            --panel-shadow: 
-                20px 20px 60px #c1c6cc, 
-                -20px -20px 60px #ffffff;
-            
-            --button-shadow: 
-                6px 6px 12px #c8ccd2, 
-                -6px -6px 12px #ffffff;
-                
-            --button-pressed-shadow: 
-                inset 6px 6px 12px #c8ccd2, 
-                inset -6px -6px 12px #ffffff;
-
-            --brand-green: #63AC2A;
-            --brand-green-hover: #529122;
-            --brand-green-glow: rgba(99, 172, 42, 0.4);
-            
-            --danger-red: #ef4444;
-            --danger-shadow: 
-                5px 5px 10px #c8ccd2, 
-                -5px -5px 10px #ffffff;
-                
-            --wave-opacity: 0.04;
-        }
-
-        [data-theme="dark"] {
-            --board-bg: #0f172a;
-            --panel-bg: #1e293b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --border-color: #334155;
-            --input-bg: #0f172a;
-            
-            --panel-shadow: 
-                20px 20px 60px #0d1424, 
-                -20px -20px 60px #111a30;
-                
-            --button-shadow: 
-                6px 6px 12px #151d2a, 
-                -6px -6px 12px #27354c;
-                
-            --button-pressed-shadow: 
-                inset 6px 6px 12px #151d2a, 
-                inset -6px -6px 12px #27354c;
-                
-            --danger-shadow: 
-                5px 5px 10px #151d2a, 
-                -5px -5px 10px #27354c;
-                
-            --wave-opacity: 0.02;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--board-bg);
-            color: var(--text-main);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            overflow-x: hidden;
-            transition: background-color 0.3s ease, color 0.3s ease;
-            position: relative;
-        }
-
-        /* Loading Screen Architecture */
-        #loading-screen {
-            position: fixed;
-            inset: 0;
-            z-index: 11000;
-            background-color: var(--board-bg);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-        
-        #loading-screen.fade-out {
-            opacity: 0;
-            visibility: hidden;
-        }
-
-        .loading-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-            width: 224px;
-        }
-
-        .animate-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
-        }
-
-        .progress-track {
-            width: 100%;
-            height: 6px;
-            background-color: var(--border-color);
-            border-radius: 9999px;
-            overflow: hidden;
-            box-shadow: var(--button-pressed-shadow);
-        }
-
-        #loading-progress {
-            height: 100%;
-            background-color: var(--brand-green);
-            width: 0%;
-            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 0 10px var(--brand-green-glow);
-        }
-
-        .loading-text {
-            font-size: 10px;
-            font-weight: 700;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-
-        /* Subtle Wave Background */
-        body::before, body::after {
-            content: '';
-            position: fixed;
-            z-index: -1;
-            background: var(--brand-green);
-            opacity: var(--wave-opacity);
-            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
-            transition: opacity 0.3s ease;
-            animation: waveFlow 25s infinite linear;
-        }
-
-        body::before { width: 150vw; height: 150vw; top: -75vw; left: -50vw; }
-        body::after { width: 100vw; height: 100vw; bottom: -40vw; right: -20vw; animation-direction: reverse; animation-duration: 35s; }
-
-        @keyframes waveFlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Hardware Toggle Switch (Dark Mode) */
-        .theme-toggle {
-            position: absolute;
-            top: 30px;
-            right: 30px;
-            background: var(--panel-bg);
-            border: none;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: var(--text-main);
-            cursor: pointer;
-            box-shadow: var(--button-shadow);
-            transition: all 0.2s ease;
-            z-index: 100;
-        }
-        
-        .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
-        .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
-
-        /* --- UI OVERHAUL CSS: PASSWORD WRAPPER, CRISP CHECKBOX, TOGGLE --- */
-        .password-wrapper {
-            position: relative;
-            width: 100%;
-        }
-
-        .toggle-password {
-            position: absolute;
-            right: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            padding: 0;
-            cursor: pointer;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s ease;
-            box-shadow: none;
-            width: auto;
-        }
-
-        .toggle-password:active {
-            box-shadow: none;
-            transform: translateY(-50%) scale(0.95);
-        }
-
-        .toggle-password:hover {
-            color: var(--brand-green);
-        }
-
-        .toggle-password svg {
-            width: 20px;
-            height: 20px;
-        }
-
-        .forgot-password {
-            font-size: 12px;
-            color: var(--brand-green);
-            text-align: right;
-            margin-top: -8px;
-            margin-bottom: 4px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: opacity 0.2s ease;
-        }
-        
-        .forgot-password:hover { opacity: 0.8; text-decoration: underline; }
-
-        /* CRISP CHECKBOX FIX: Stripped native styling completely */
-        .legal-check {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            font-size: 12px;
-            color: var(--text-muted);
-            text-align: left;
-            margin-top: 4px;
-            line-height: 1.4;
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .legal-check input {
-            appearance: none;
-            -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
-            min-width: 18px;
-            margin: 2px 0 0 0;
-            background-color: var(--input-bg);
-            border: 2px solid var(--border-color); /* Stronger, flat border */
-            border-radius: 4px;
-            cursor: pointer;
-            position: relative;
-            box-shadow: none; /* Removed the shadow causing the blur */
-            outline: none;
-            transition: all 0.15s ease;
-        }
-
-        .legal-check input:checked {
-            background-color: var(--brand-green);
-            border-color: var(--brand-green);
-        }
-
-        /* Pure CSS white checkmark */
-        .legal-check input:checked::after {
-            content: '';
-            position: absolute;
-            left: 4px;
-            top: 1px;
-            width: 4px;
-            height: 9px;
-            border: solid white;
-            border-width: 0 2px 2px 0;
-            transform: rotate(45deg);
-        }
-
-        .legal-check a {
-            color: var(--brand-green);
-            text-decoration: underline;
-            font-weight: 600;
-        }
-
-        /* Auth Mode Toggle Link */
-        .auth-toggle-container {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-top: 20px;
-            font-weight: 500;
-        }
-
-        .auth-toggle-container a {
-            color: var(--brand-green);
-            font-weight: 700;
-            text-decoration: none;
-            margin-left: 4px;
-            transition: opacity 0.2s ease;
-        }
-
-        .auth-toggle-container a:hover {
-            opacity: 0.8;
-            text-decoration: underline;
-        }
-
-        /* --- END UI OVERHAUL CSS --- */
-
-        .paywall-box {
-            background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 24px;
-            text-align: left;
-            font-size: 14px;
-            color: var(--text-muted);
-            box-shadow: var(--button-pressed-shadow);
-            line-height: 1.6;
-        }
-
-        .btn-text-danger {
-            background: none;
-            border: none;
-            color: var(--danger-red);
-            font-size: 13px;
-            font-weight: 600;
-            text-decoration: underline;
-            cursor: pointer;
-            padding: 10px;
-            margin-top: 16px;
-            box-shadow: none;
-            transition: opacity 0.2s ease;
-        }
-
-        .btn-text-danger:hover { opacity: 0.7; }
-
-        /* Nuclear Delete Modal */
-        #delete-modal-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 12000;
-            background-color: rgba(239, 68, 68, 0.15); 
-            backdrop-filter: blur(12px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-        }
-
-        #delete-modal-overlay.active { opacity: 1; visibility: visible; }
-
-        .delete-modal-box {
-            background: var(--panel-bg);
-            padding: 40px;
-            border-radius: 24px;
-            width: 90%;
-            max-width: 420px;
-            box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.3), var(--panel-shadow);
-            border: 2px solid var(--danger-red);
-            text-align: center;
-            transform: scale(0.95);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        #delete-modal-overlay.active .delete-modal-box { transform: scale(1); }
-
-        .delete-modal-box h2 {
-            color: var(--danger-red); margin-top: 0; margin-bottom: 12px;
-            font-size: 24px; text-transform: uppercase; letter-spacing: 0.05em;
-        }
-
-        .delete-modal-box p { font-size: 14px; margin-bottom: 24px; color: var(--text-main); line-height: 1.6; }
-
-        .delete-btn-group { display: flex; gap: 12px; margin-top: 24px; }
-
-        .btn-cancel {
-            background-color: var(--input-bg); color: var(--text-main); flex: 1;
-            padding: 16px; border: none; border-radius: 12px; font-weight: 700;
-            font-size: 15px; cursor: pointer; box-shadow: var(--button-shadow); transition: all 0.2s ease;
-        }
-
-        .btn-cancel:active { box-shadow: var(--button-pressed-shadow); transform: translateY(2px); }
-
-        .btn-confirm-delete {
-            background-color: var(--danger-red); color: white; flex: 1;
-            padding: 16px; border: none; border-radius: 12px; font-weight: 700;
-            font-size: 15px; cursor: pointer; box-shadow: 4px 4px 8px rgba(239, 68, 68, 0.3), -4px -4px 8px rgba(255,255,255,0.05); transition: all 0.2s ease;
-        }
-
-        .btn-confirm-delete:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); transform: translateY(2px); }
-
-        /* The Physical Panel */
-        .container {
-            background: var(--panel-bg); padding: 50px 40px; border-radius: 24px;
-            box-shadow: var(--panel-shadow); width: 100%; max-width: 850px; 
-            text-align: center; transition: all 0.3s ease; position: relative;
-            border: 1px solid var(--border-color); z-index: 10;
-        }
-
-        /* Fake Screws in the Corners */
-        .container::before, .container::after {
-            content: ''; position: absolute; width: 12px; height: 12px;
-            border-radius: 50%; background: var(--panel-bg);
-            box-shadow: inset 2px 2px 4px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.7);
-        }
-        .container::before { top: 20px; left: 20px; }
-        .container::after { top: 20px; right: 20px; }
-
-        #auth-section, #paywall-section { max-width: 400px; margin: 0 auto; }
-
-        /* Tactile Logo Shell */
-        .tactile-logo {
-            background: none; border: none; padding: 0; cursor: pointer;
-            display: inline-block; margin-bottom: 24px; outline: none;
-            transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .tactile-logo:active { transform: scale(0.95); }
-        .brand-logo { width: 70px; height: auto; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.1)); }
-
-        p { color: var(--text-muted); margin: 0 0 32px 0; font-size: 15px; font-weight: 500; line-height: 1.5; }
-        form { display: flex; flex-direction: column; gap: 16px; }
-
-        /* Inputs & Buttons */
-        input {
-            width: 100%; padding: 16px; border: 1px solid transparent; border-radius: 12px;
-            box-sizing: border-box; background-color: var(--input-bg); color: var(--text-main);
-            font-size: 15px; transition: all 0.2s ease; font-family: inherit;
-            box-shadow: var(--button-pressed-shadow);
-        }
-        input:focus { outline: none; border-color: var(--brand-green); box-shadow: 0 0 0 2px var(--brand-green-glow), var(--button-pressed-shadow); }
-        input::placeholder { color: var(--text-muted); }
-
-        button {
-            width: 100%; padding: 16px; border: none; border-radius: 12px;
-            font-weight: 700; font-size: 16px; cursor: pointer; transition: all 0.15s ease; font-family: inherit;
-        }
-        .btn-primary { 
-            background-color: var(--brand-green); color: white; margin-top: 8px; 
-            box-shadow: 4px 4px 8px rgba(99, 172, 42, 0.3), -4px -4px 8px rgba(255,255,255,0.1); 
-        }
-        .btn-primary:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); transform: translateY(2px); }
-        
-        .btn-secondary { background-color: var(--panel-bg); color: var(--text-main); box-shadow: var(--button-shadow); }
-        .btn-secondary:active { box-shadow: var(--button-pressed-shadow); transform: translateY(2px); }
-
-        .btn-danger {
-            background-color: var(--panel-bg); color: var(--danger-red);
-            padding: 16px 32px; border-radius: 12px; border: 2px solid var(--danger-red);
-            font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: var(--danger-shadow);
-            transition: all 0.15s ease; display: inline-block; margin-top: 32px; max-width: 300px;
-        }
-        .btn-danger:active {
-            box-shadow: var(--button-pressed-shadow); transform: translateY(2px);
-            background-color: rgba(239, 68, 68, 0.1); border-color: transparent;
-        }
-
-        /* The Physical App Grid */
-        .app-grid { display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 40px; margin-bottom: 40px; }
-        @media (min-width: 640px) { .app-grid { grid-template-columns: repeat(2, 1fr); gap: 30px; } }
-
-        .app-card {
-            display: flex; flex-direction: row; align-items: flex-start; gap: 20px; padding: 24px;
-            background: var(--panel-bg); text-decoration: none; border-radius: 16px;
-            box-shadow: var(--button-shadow); border: 2px solid transparent;
-            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); position: relative; cursor: pointer;
-        }
-        .app-card:hover { border-color: var(--brand-green); box-shadow: 0 0 20px var(--brand-green-glow), var(--button-shadow); }
-        .app-card:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.98) translateY(2px); border-color: transparent; }
-
-        .app-card-icon {
-            flex-shrink: 0; width: 54px; height: 54px; border-radius: 12px; 
-            box-shadow: var(--button-pressed-shadow); display: flex; justify-content: center; align-items: center;
-        }
-        .app-card-icon img { width: 32px; height: 32px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1)); }
-
-        .app-card-content { display: flex; flex-direction: column; text-align: left; }
-        .app-card h3 { margin: 0 0 8px 0; font-size: 17px; font-weight: 700; color: var(--text-main); }
-        .app-card p { margin: 0; font-size: 14px; color: var(--text-muted); line-height: 1.5; }
-        
-        .hidden { display: none !important; }
-        #error-message { color: #ef4444; font-size: 14px; margin-top: 12px; min-height: 20px; font-weight: 500; }
-    </style>
-</head>
-<body>
-
-    <div id="loading-screen">
-        <div class="loading-container">
-            <img src="logo.png" alt="Loading..." class="brand-logo animate-pulse" onerror="this.style.display='none'">
-            <div class="progress-track">
-                <div id="loading-progress"></div>
-            </div>
-            <span id="loading-text" class="loading-text animate-pulse">Initializing Environment...</span>
-        </div>
-    </div>
-
-    <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle Dark Mode">
-        <svg id="moon-icon" viewBox="0 0 24 24">
-            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
-        </svg>
-        <svg id="sun-icon" class="hidden" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="5" fill="currentColor"></circle>
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
-        </svg>
-    </button>
-
-    <div class="container">
-        <div id="auth-section">
-            <button class="tactile-logo" onclick="window.location.reload()">
-                <img src="logo.png" alt="Market Technician Logo" class="brand-logo" onerror="this.style.display='none'">
-            </button>
-            
-            <p id="auth-title">Sign in to access your account.</p>
-            
-            <form id="auth-form">
-                <input type="email" id="email" placeholder="Email Address" required>
-                
-                <div class="password-wrapper">
-                    <input type="password" id="password" placeholder="Password" required>
-                    <button type="button" class="toggle-password" id="toggle-password-btn" tabindex="-1">
-                        <svg id="eye-icon-closed" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
-                        </svg>
-                        <svg id="eye-icon-open" class="hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                        </svg>
-                    </button>
-                </div>
-                
-                <a href="#" id="forgot-password-link" class="forgot-password">Forgot Password?</a>
-                
-                <label class="legal-check hidden" id="legal-check-container">
-                    <input type="checkbox" id="legal-checkbox">
-                    <span>I have read and agree to the <a href="terms.html" target="_blank">Terms & Conditions</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>.</span>
-                </label>
-
-                <button type="submit" id="login-btn" class="btn-primary">Sign In</button>
-                <button type="button" id="signup-btn" class="btn-primary hidden">Create Account</button>
-                
-                <div class="auth-toggle-container">
-                    <span id="auth-toggle-text">Don't have an account?</span>
-                    <a href="#" id="auth-toggle-link">Sign Up</a>
-                </div>
-
-            </form>
-            <div id="error-message"></div>
-        </div>
-
-        <div id="paywall-section" class="hidden">
-            <button class="tactile-logo" onclick="window.location.reload()">
-                <img src="logo.png" alt="Market Technician Logo" class="brand-logo" onerror="this.style.display='none'">
-            </button>
-            
-            <h2 style="color: var(--text-main); margin-top: 0; margin-bottom: 8px;">Access Restricted</h2>
-            <p>Your subscription is pending or has expired.</p>
-            
-            <div class="paywall-box">
-                <strong style="color: var(--text-main);">To activate your VIP access:</strong><br><br>
-                1. Send payment via GCash or Bank Transfer.<br>
-                2. Email your receipt to: <strong>admin@the-market-technician.com</strong><br>
-                3. Your account will be manually unlocked within 24 hours.
-            </div>
-
-            <button id="paywall-logout-btn" class="btn-secondary">Log Out</button>
-        </div>
-
-        <div id="dashboard-section" class="hidden">
-            <button class="tactile-logo">
-                <img src="logo.png" alt="Market Technician Logo" class="brand-logo" onerror="this.style.display='none'">
-            </button>
-            
-            <p>Active profile: <strong id="user-email"></strong></p>
-            
-            <div class="app-grid">
-                <a href="wealth_sandbox/index.html" class="app-card">
-                    <div class="app-card-icon">
-                        <img src="icon_wealth_sandbox.png" alt="Wealth Sandbox" onerror="this.style.display='none'">
-                    </div>
-                    <div class="app-card-content">
-                        <h3>Wealth Sandbox</h3>
-                        <p>Project your long-term passive wealth based on starting capital, top-ups, and dividend yields.</p>
-                    </div>
-                </a>
-                
-                <a href="risk_profile/index.html" class="app-card">
-                    <div class="app-card-icon">
-                        <img src="icon_risk_profile.png" alt="Risk Profile" onerror="this.style.display='none'">
-                    </div>
-                    <div class="app-card-content">
-                        <h3>Risk Profile Assessment</h3>
-                        <p>Discover your true mathematical risk tolerance. Get a personalized portfolio allocation based on your financial foundation and goals.</p>
-                    </div>
-                </a>
-                
-                <a href="trading_sandbox/index.html" class="app-card">
-                    <div class="app-card-icon">
-                        <img src="icon_trading_sandbox.png" alt="Trading Sandbox" onerror="this.style.display='none'">
-                    </div>
-                    <div class="app-card-content">
-                        <h3>Trading Portfolio Sandbox</h3>
-                        <p>Analyze your true trading edge. Log your trades, simulate expectancy, and optimize your performance.</p>
-                    </div>
-                </a>
-                
-                <a href="strike_planner/index.html" class="app-card">
-                    <div class="app-card-icon">
-                        <img src="icon_strike_planner.png" alt="Strike Planner" onerror="this.style.display='none'">
-                    </div>
-                    <div class="app-card-content">
-                        <h3>Strike Planner</h3>
-                        <p>Create quick trading plans. Calculate perfect position sizing and manage your Value at Risk (VaR).</p>
-                    </div>
-                </a>
-                
-                <a href="dividend_sandbox/index.html" class="app-card">
-                    <div class="app-card-icon">
-                        <img src="icon_dividend_sandbox.png" alt="Dividend Sandbox" onerror="this.style.display='none'">
-                    </div>
-                    <div class="app-card-content">
-                        <h3>Dividend Portfolio Sandbox</h3>
-                        <p>Build your passive income through dividend investing. Allocate capital, track sector exposure, and project your cash flow.</p>
-                    </div>
-                </a>
-
-                <a href="finance101/index.html" class="app-card">
-                    <div class="app-card-icon">
-                        <img src="icon_finance101.png" alt="Finance 101" onerror="this.style.display='none'">
-                    </div>
-                    <div class="app-card-content">
-                        <h3>Personal Finance 101</h3>
-                        <p>Map out your net worth, track your monthly budget, and generate your personalized financial action plan.</p>
-                    </div>
-                </a>
-            </div>
-
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <button id="logout-btn" class="btn-danger">Disconnect / Log Out</button>
-                <button id="delete-account-btn" class="btn-text-danger">Delete Account Permanently</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="delete-modal-overlay">
-        <div class="delete-modal-box">
-            <svg style="width: 48px; height: 48px; color: var(--danger-red); margin: 0 auto 16px auto;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-            </svg>
-            <h2>Nuclear Alert</h2>
-            <p>Are you absolutely sure you want to permanently delete your account? This will erase your VIP access and all your saved portfolio data.<br><br><strong style="color: var(--text-main);">This cannot be undone.</strong></p>
-            
-            <input type="password" id="delete-password-confirm" placeholder="Enter your password to confirm" required>
-            <div id="delete-error-message" style="color: var(--danger-red); font-size: 12px; margin-top: 8px; min-height: 16px; font-weight: 600;"></div>
-            
-            <div class="delete-btn-group">
-                <button id="cancel-delete-btn" class="btn-cancel" onclick="document.getElementById('delete-modal-overlay').classList.remove('active')">Cancel</button>
-                <button id="confirm-delete-btn" class="btn-confirm-delete">Erase Data</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // NEW: Theme Toggle Logic (Now saves to Local Storage)
-        const themeBtn = document.getElementById('theme-toggle-btn');
-        const htmlElement = document.documentElement;
-        const sunIcon = document.getElementById('sun-icon');
-        const moonIcon = document.getElementById('moon-icon');
-
-        // Set the correct icon on initial load
-        if (htmlElement.getAttribute('data-theme') === 'dark') {
-            moonIcon.classList.add('hidden');
-            sunIcon.classList.remove('hidden');
-        }
-
-        themeBtn.addEventListener('click', () => {
-            const currentTheme = htmlElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            htmlElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('mt-theme', newTheme); // Save to memory!
-
-            if (newTheme === 'dark') {
-                moonIcon.classList.add('hidden');
-                sunIcon.classList.remove('hidden');
+    if(loadingProgress) loadingProgress.style.width = '100%';
+    
+    setTimeout(() => {
+        if(loadingScreen) loadingScreen.classList.add('fade-out');
+    }, 400);
+
+    if (user) {
+        authSection.classList.add('hidden');
+        userEmailDisplay.textContent = user.email;
+
+        try {
+            const docRef = doc(db, "users", user.uid);
+            const docSnap = await getDoc(docRef);
+
+            let hasAccess = false;
+
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.accessExpiresAt) {
+                    const expiryDate = data.accessExpiresAt.toDate ? data.accessExpiresAt.toDate() : new Date(data.accessExpiresAt);
+                    if (expiryDate > new Date()) {
+                        hasAccess = true;
+                    }
+                }
+            }
+
+            if (hasAccess) {
+                paywallSection.classList.add('hidden');
+                dashboardSection.classList.remove('hidden'); 
             } else {
-                sunIcon.classList.add('hidden');
-                moonIcon.classList.remove('hidden');
+                dashboardSection.classList.add('hidden');
+                paywallSection.classList.remove('hidden'); 
+            }
+
+        } catch (error) {
+            console.error("Error checking access expiration:", error);
+            dashboardSection.classList.add('hidden');
+            paywallSection.classList.remove('hidden'); 
+        }
+
+    } else {
+        authSection.classList.remove('hidden');
+        dashboardSection.classList.add('hidden');
+        paywallSection.classList.add('hidden');
+        userEmailDisplay.textContent = "";
+
+        // FIX: Reset stuck buttons and wipe password field on logout
+        loginBtn.textContent = "Sign In";
+        signupBtn.textContent = "Create Account";
+        passwordInput.value = "";
+    }
+});
+
+// 6. Handle Form Submission (Smartly routes Login vs Signup based on mode)
+authForm.addEventListener('submit', (e) => {
+    e.preventDefault(); 
+    errorMessage.textContent = ""; 
+    errorMessage.style.color = "var(--danger-red)"; 
+    
+    // If they press "Enter" while in Sign Up mode, trigger the signup logic instead!
+    if (isSignUpMode) {
+        signupBtn.click();
+        return;
+    }
+    
+    const email = emailInput.value;
+    const password = passwordInput.value;
+
+    // NEW: Drop the curtain immediately!
+    dropCurtain("Authenticating Credentials...");
+
+    signInWithEmailAndPassword(auth, email, password)
+        .catch((error) => {
+            // Pull the curtain back up on fail
+            if(loadingScreen) loadingScreen.classList.add('fade-out');
+            errorMessage.textContent = "Invalid email or password.";
+        });
+});
+
+// 7. Handle Sign Up
+signupBtn.addEventListener('click', () => {
+    errorMessage.textContent = "";
+    errorMessage.style.color = "var(--danger-red)"; 
+    
+    const email = emailInput.value;
+    const password = passwordInput.value;
+
+    if(!email || !password) {
+        errorMessage.textContent = "Please enter an email and password to sign up.";
+        return;
+    }
+
+    if(!legalCheckbox.checked) {
+        errorMessage.textContent = "You must agree to the Terms & Conditions and Privacy Policy to create an account.";
+        return;
+    }
+
+    // NEW: Drop the curtain immediately!
+    dropCurtain("Provisioning Secure Workspace...");
+
+    createUserWithEmailAndPassword(auth, email, password)
+        .catch((error) => {
+            // Pull the curtain back up on fail
+            if(loadingScreen) loadingScreen.classList.add('fade-out');
+            if(error.code === 'auth/email-already-in-use') {
+                errorMessage.textContent = "This email is already registered. Please sign in.";
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage.textContent = "Password should be at least 6 characters.";
+            } else {
+                errorMessage.textContent = error.message;
             }
         });
+});
 
-        // Eye Icon Toggle Logic
-        const togglePasswordBtn = document.getElementById('toggle-password-btn');
-        const passwordInput = document.getElementById('password');
-        const eyeIconClosed = document.getElementById('eye-icon-closed');
-        const eyeIconOpen = document.getElementById('eye-icon-open');
+// 8. Handle Forgot Password
+forgotPasswordLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    errorMessage.textContent = "";
+    const email = emailInput.value;
 
-        togglePasswordBtn.addEventListener('click', () => {
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                eyeIconClosed.classList.add('hidden');
-                eyeIconOpen.classList.remove('hidden');
-            } else {
-                passwordInput.type = 'password';
-                eyeIconOpen.classList.add('hidden');
-                eyeIconClosed.classList.remove('hidden');
-            }
+    if(!email) {
+        errorMessage.textContent = "Please enter your email address in the box above, then click Forgot Password.";
+        errorMessage.style.color = "var(--danger-red)";
+        return;
+    }
+
+    sendPasswordResetEmail(auth, email)
+        .then(() => {
+            errorMessage.style.color = "var(--brand-green)"; 
+            errorMessage.textContent = "Password reset email sent! Please check your inbox.";
+        })
+        .catch((error) => {
+            errorMessage.style.color = "var(--danger-red)";
+            errorMessage.textContent = "Error sending reset email. Make sure the email is correct.";
         });
-    </script>
+});
 
-    <script type="module" src="app.js"></script>
-</body>
-</html>
+// 9. Handle Logouts
+logoutBtn.addEventListener('click', () => {
+    signOut(auth).catch((error) => console.error("Logout Error:", error));
+});
+
+paywallLogoutBtn.addEventListener('click', () => {
+    signOut(auth).catch((error) => console.error("Logout Error:", error));
+});
+
+// 10. Handle Delete Account (NUCLEAR LOCK)
+// Step 1: Trigger the Modal
+deleteAccountBtn.addEventListener('click', () => {
+    deleteErrorMessage.textContent = ""; // Clear any old errors
+    deletePasswordConfirm.value = ""; // Clear old password inputs
+    deleteModalOverlay.classList.add('active'); // Turn on the red atmosphere
+});
+
+// Step 2: Process the Deletion
+confirmDeleteBtn.addEventListener('click', async () => {
+    const user = auth.currentUser;
+    const password = deletePasswordConfirm.value;
+
+    if (!user) return;
+
+    if (!password) {
+        deleteErrorMessage.textContent = "You must enter your password to proceed.";
+        return;
+    }
+
+    // UI Feedback
+    const originalText = confirmDeleteBtn.textContent;
+    confirmDeleteBtn.textContent = "Erasing Data...";
+
+    try {
+        // Build the security credential using their current email and the password they just typed
+        const credential = EmailAuthProvider.credential(user.email, password);
+
+        // Force Firebase to verify the password against their servers
+        await reauthenticateWithCredential(user, credential);
+
+        // If the code reaches this line, the password was a perfect match. Incinerate the account.
+        await deleteUser(user);
+
+        // Clean up the UI
+        deleteModalOverlay.classList.remove('active');
+        alert("Your account and all associated data have been permanently erased.");
+        // The onAuthStateChanged listener will automatically detect they are gone and kick them to the login screen.
+
+    } catch (error) {
+        // If the code jumps here, the password was wrong (or another error occurred)
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+            deleteErrorMessage.textContent = "Incorrect password. Deletion aborted.";
+        } else {
+            deleteErrorMessage.textContent = "An error occurred: " + error.message;
+        }
+        confirmDeleteBtn.textContent = originalText; // Reset button text
+    }
+});
