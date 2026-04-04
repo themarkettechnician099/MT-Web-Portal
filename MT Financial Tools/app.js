@@ -12,7 +12,8 @@ import {
     reauthenticateWithCredential 
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+// NEW: Added setDoc to write the new user's database file
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // 2. YOUR FIREBASE CONFIGURATION
 const firebaseConfig = {
@@ -27,13 +28,13 @@ const firebaseConfig = {
 // --- LOADING SCREEN LOGIC (Phase 1) ---
 const loadingScreen = document.getElementById('loading-screen');
 const loadingProgress = document.getElementById('loading-progress');
-const loadingTextDisplay = document.getElementById('loading-text'); // NEW
+const loadingTextDisplay = document.getElementById('loading-text'); 
 
 setTimeout(() => {
     if(loadingProgress) loadingProgress.style.width = '92%';
 }, 50);
 
-// NEW: Function to dynamically drop the curtain during Auth events
+// Function to dynamically drop the curtain during Auth events
 function dropCurtain(message) {
     if(loadingTextDisplay) loadingTextDisplay.textContent = message;
     if(loadingScreen) loadingScreen.classList.remove('fade-out');
@@ -68,18 +69,22 @@ const errorMessage = document.getElementById('error-message');
 const forgotPasswordLink = document.getElementById('forgot-password-link'); 
 const deleteAccountBtn = document.getElementById('delete-account-btn'); 
 
-// NEW: UX Toggle Elements
+// UX Toggle Elements
 const authTitle = document.getElementById('auth-title');
 const authToggleLink = document.getElementById('auth-toggle-link');
 const authToggleText = document.getElementById('auth-toggle-text');
 const legalCheckContainer = document.getElementById('legal-check-container');
 const legalCheckbox = document.getElementById('legal-checkbox'); 
 
-// NEW: Delete Modal Elements
+// Delete Modal Elements
 const deleteModalOverlay = document.getElementById('delete-modal-overlay');
 const deletePasswordConfirm = document.getElementById('delete-password-confirm');
 const deleteErrorMessage = document.getElementById('delete-error-message');
 const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+// NEW: Tier Gatekeeper Elements
+const upgradeBanner = document.getElementById('upgrade-banner');
+const premiumApps = document.querySelectorAll('.premium-app');
 
 // --- 4.5 UX TOGGLE LOGIC ---
 let isSignUpMode = false;
@@ -87,7 +92,7 @@ let isSignUpMode = false;
 authToggleLink.addEventListener('click', (e) => {
     e.preventDefault();
     isSignUpMode = !isSignUpMode;
-    errorMessage.textContent = ""; // Clear errors on flip
+    errorMessage.textContent = ""; 
 
     // 1. Drop the curtain based on destination
     if (isSignUpMode) {
@@ -99,7 +104,6 @@ authToggleLink.addEventListener('click', (e) => {
     // 2. Wait for the curtain to fall (600ms), flip the UI, then lift it!
     setTimeout(() => {
         if (isSignUpMode) {
-            // Switch to Sign Up View
             authTitle.textContent = "Create your account.";
             loginBtn.classList.add('hidden');
             forgotPasswordLink.classList.add('hidden');
@@ -108,7 +112,6 @@ authToggleLink.addEventListener('click', (e) => {
             authToggleText.textContent = "Already have an account?";
             authToggleLink.textContent = "Log In";
         } else {
-            // Switch to Sign In View
             authTitle.textContent = "Sign in to access your account.";
             signupBtn.classList.add('hidden');
             legalCheckContainer.classList.add('hidden');
@@ -123,7 +126,7 @@ authToggleLink.addEventListener('click', (e) => {
     }, 600); 
 });
 
-// 5. Monitor Auth State & Enforce Paywall
+// 5. Monitor Auth State & Enforce Paywall (UPDATED for Tiers)
 onAuthStateChanged(auth, async (user) => { 
     
     if(loadingProgress) loadingProgress.style.width = '100%';
@@ -141,9 +144,15 @@ onAuthStateChanged(auth, async (user) => {
             const docSnap = await getDoc(docRef);
 
             let hasAccess = false;
+            let userTier = "trial"; // Default fallback if no tier is found
 
             if (docSnap.exists()) {
                 const data = docSnap.data();
+                
+                if (data.tier) {
+                    userTier = data.tier;
+                }
+
                 if (data.accessExpiresAt) {
                     const expiryDate = data.accessExpiresAt.toDate ? data.accessExpiresAt.toDate() : new Date(data.accessExpiresAt);
                     if (expiryDate > new Date()) {
@@ -155,6 +164,18 @@ onAuthStateChanged(auth, async (user) => {
             if (hasAccess) {
                 paywallSection.classList.add('hidden');
                 dashboardSection.classList.remove('hidden'); 
+                
+                // --- NEW: THE TIER GATEKEEPER LOGIC ---
+                if (userTier === "premium") {
+                    // Full access: hide the nag banner, show all apps
+                    if (upgradeBanner) upgradeBanner.classList.add('hidden');
+                    premiumApps.forEach(app => app.classList.remove('hidden'));
+                } else {
+                    // Trial access: show the nag banner, hide premium apps
+                    if (upgradeBanner) upgradeBanner.classList.remove('hidden');
+                    premiumApps.forEach(app => app.classList.add('hidden'));
+                }
+
             } else {
                 dashboardSection.classList.add('hidden');
                 paywallSection.classList.remove('hidden'); 
@@ -172,20 +193,18 @@ onAuthStateChanged(auth, async (user) => {
         paywallSection.classList.add('hidden');
         userEmailDisplay.textContent = "";
         
-        // FIX: Reset stuck buttons and wipe password field on logout
         loginBtn.textContent = "Sign In";
         signupBtn.textContent = "Create Account";
         passwordInput.value = "";
     }
 });
 
-// 6. Handle Form Submission (Smartly routes Login vs Signup based on mode)
+// 6. Handle Form Submission 
 authForm.addEventListener('submit', (e) => {
     e.preventDefault(); 
     errorMessage.textContent = ""; 
     errorMessage.style.color = "var(--danger-red)"; 
     
-    // If they press "Enter" while in Sign Up mode, trigger the signup logic instead!
     if (isSignUpMode) {
         signupBtn.click();
         return;
@@ -194,18 +213,16 @@ authForm.addEventListener('submit', (e) => {
     const email = emailInput.value;
     const password = passwordInput.value;
 
-    // Drop the curtain immediately!
     dropCurtain("Authenticating Credentials...");
 
     signInWithEmailAndPassword(auth, email, password)
         .catch((error) => {
-            // Pull the curtain back up on fail
             if(loadingScreen) loadingScreen.classList.add('fade-out');
             errorMessage.textContent = "Invalid email or password.";
         });
 });
 
-// 7. Handle Sign Up
+// 7. Handle Sign Up (UPDATED to automate 5-day trial)
 signupBtn.addEventListener('click', () => {
     errorMessage.textContent = "";
     errorMessage.style.color = "var(--danger-red)"; 
@@ -223,12 +240,26 @@ signupBtn.addEventListener('click', () => {
         return;
     }
 
-    // Drop the curtain immediately!
     dropCurtain("Provisioning Secure Workspace...");
 
     createUserWithEmailAndPassword(auth, email, password)
+        .then(async (userCredential) => {
+            const user = userCredential.user;
+            
+            // Calculate exactly 5 days from this moment
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + 5);
+
+            // Build their database file with the trial tier and expiration
+            await setDoc(doc(db, "users", user.uid), {
+                email: user.email,
+                tier: "trial",
+                accessExpiresAt: expiryDate
+            });
+            
+            // Note: The onAuthStateChanged listener will automatically detect the login and route them!
+        })
         .catch((error) => {
-            // Pull the curtain back up on fail
             if(loadingScreen) loadingScreen.classList.add('fade-out');
             if(error.code === 'auth/email-already-in-use') {
                 errorMessage.textContent = "This email is already registered. Please sign in.";
