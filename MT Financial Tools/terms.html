@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms & Conditions | The Market Technician</title>
+    
+    <script>
+        // Inherit the user's theme preference from the main portal
+        const savedTheme = localStorage.getItem('mt-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        /* Exact CSS Variables from your Main Portal */
+        :root {
+            --board-bg: #e2e8f0; 
+            --panel-bg: #f1f5f9; 
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #cbd5e1;
+            --input-bg: #e2e8f0;
+            
+            --panel-shadow: 20px 20px 60px #c1c6cc, -20px -20px 60px #ffffff;
+            --button-shadow: 6px 6px 12px #c8ccd2, -6px -6px 12px #ffffff;
+            --button-pressed-shadow: inset 6px 6px 12px #c8ccd2, inset -6px -6px 12px #ffffff;
+
+            --brand-green: #63AC2A;
+            --brand-green-hover: #529122;
+            --brand-green-glow: rgba(99, 172, 42, 0.4);
+            
+            --wave-opacity: 0.04;
+        }
+
+        [data-theme="dark"] {
+            --board-bg: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --input-bg: #0f172a;
+            
+            --panel-shadow: 20px 20px 60px #0d1424, -20px -20px 60px #111a30;
+            --button-shadow: 6px 6px 12px #151d2a, -6px -6px 12px #27354c;
+            --button-pressed-shadow: inset 6px 6px 12px #151d2a, inset -6px -6px 12px #27354c;
+            
+            --wave-opacity: 0.02;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--board-bg);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align top for scrolling */
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px 20px;
+            overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        /* Subtle Wave Background */
+        body::before, body::after {
+            content: ''; position: fixed; z-index: -1; background: var(--brand-green);
+            opacity: var(--wave-opacity); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+            transition: opacity 0.3s ease; animation: waveFlow 25s infinite linear;
+        }
+        body::before { width: 150vw; height: 150vw; top: -75vw; left: -50vw; }
+        body::after { width: 100vw; height: 100vw; bottom: -40vw; right: -20vw; animation-direction: reverse; animation-duration: 35s; }
+        @keyframes waveFlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Hardware Toggle Switch */
+        .theme-toggle {
+            position: fixed; top: 20px; right: 20px; background: var(--panel-bg);
+            border: none; border-radius: 50%; width: 48px; height: 48px;
+            display: flex; justify-content: center; align-items: center;
+            color: var(--text-main); cursor: pointer; box-shadow: var(--button-shadow);
+            transition: all 0.2s ease; z-index: 100;
+        }
+        .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
+        .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
+        .hidden { display: none !important; }
+
+        /* Document Container */
+        .document-container {
+            background: var(--panel-bg);
+            padding: 50px 60px;
+            border-radius: 24px;
+            box-shadow: var(--panel-shadow);
+            width: 100%;
+            max-width: 800px; /* Wider for reading */
+            border: 1px solid var(--border-color);
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Fake Screws */
+        .document-container::before, .document-container::after {
+            content: ''; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--panel-bg);
+            box-shadow: inset 2px 2px 4px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.7);
+        }
+        .document-container::before { top: 20px; left: 20px; }
+        .document-container::after { top: 20px; right: 20px; }
+
+        /* Typography optimized for reading */
+        h1 { font-size: 28px; font-weight: 800; margin-top: 0; margin-bottom: 8px; color: var(--text-main); }
+        .last-updated { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 40px; display: block; }
+        
+        h2 { font-size: 18px; font-weight: 700; color: var(--brand-green); margin-top: 40px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;}
+        
+        p, li { font-size: 15px; color: var(--text-muted); line-height: 1.7; margin-bottom: 16px; font-weight: 500; }
+        ul { margin-bottom: 24px; padding-left: 20px;}
+        strong { color: var(--text-main); }
+
+        .disclaimer-box {
+            background-color: rgba(239, 68, 68, 0.05);
+            border-left: 4px solid var(--danger-red);
+            padding: 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 32px 0;
+        }
+        .disclaimer-box p { color: var(--text-main); margin-bottom: 0; font-weight: 600; }
+
+        /* Back Button */
+        .btn-back {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 100%; padding: 16px; background-color: var(--brand-green);
+            color: white; font-weight: 700; font-size: 16px; text-decoration: none;
+            border-radius: 12px; margin-top: 40px; box-shadow: 4px 4px 8px rgba(99, 172, 42, 0.3), -4px -4px 8px rgba(255,255,255,0.1);
+            transition: all 0.15s ease; text-align: center;
+        }
+        .btn-back:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); transform: translateY(2px); }
+
+        @media (max-width: 600px) {
+            .document-container { padding: 40px 24px; }
+            h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+    <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle Dark Mode">
+        <svg id="moon-icon" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+        </svg>
+        <svg id="sun-icon" class="hidden" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5" fill="currentColor"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+        </svg>
+    </button>
+
+    <div class="document-container">
+        <h1>Terms & Conditions</h1>
+        <span class="last-updated">Last Updated: April 2026</span>
+
+        <p>Welcome to <strong>The Market Technician</strong>. By registering an account, accessing, or using our suite of tools (the "Service"), you agree to be bound by these Terms and Conditions. If you disagree with any part of the terms, you do not have permission to access the Service.</p>
+
+        <div class="disclaimer-box">
+            <p>CRITICAL DISCLAIMER: The Market Technician is NOT a registered investment advisor, broker-dealer, or financial planner. All tools, calculators, and content provided on this platform are strictly for educational and informational purposes only.</p>
+        </div>
+
+        <h2>1. Nature of the Service</h2>
+        <p>The Market Technician provides mathematical, statistical, and organizational sandboxes designed to help users simulate financial scenarios. These tools include, but are not limited to:</p>
+        <ul>
+            <li>The Wealth Sandbox</li>
+            <li>Risk Profile Assessment</li>
+            <li>Trading Portfolio Sandbox</li>
+            <li>Strike Planner</li>
+            <li>Dividend Portfolio Sandbox</li>
+            <li>Personal Finance 101</li>
+        </ul>
+        <p>You acknowledge that any calculations, projections, or metrics generated by these tools are simulations based on the data you input and historical mathematical principles. They do not constitute guarantees of future performance, nor do they represent professional financial advice.</p>
+
+        <h2>2. Assumption of Risk</h2>
+        <p>Trading and investing in financial markets involves a high degree of risk, including the complete loss of your principal capital. By using The Market Technician, you explicitly agree that:</p>
+        <ul>
+            <li>You are solely responsible for your own investment decisions.</li>
+            <li>You will not use the output of our tools as the sole basis for executing real-world financial trades.</li>
+            <li>The Market Technician, its founders, and affiliates hold absolutely zero liability for any financial losses, damages, or tax consequences resulting from actions you take based on the use of our Service.</li>
+        </ul>
+
+        <h2>3. Accounts and Subscriptions</h2>
+        <p><strong>Free Trial:</strong> Upon registration, users are granted a limited, automated 5-day free trial. During this period, access is restricted to a specific subset of Tier 1 applications.</p>
+        <p><strong>Premium Access:</strong> Full access to the Service is granted manually upon verification of payment. Because subscription upgrades are currently processed manually via Google Forms and third-party payment providers (e.g., GCash, Bank Transfer), you acknowledge that it may take up to 24 hours for Premium access to be applied to your account.</p>
+        <p><strong>Account Security:</strong> You are responsible for safeguarding the password that you use to access the Service. The Market Technician uses secure, third-party authentication (Google Firebase) and does not store or have direct access to your plaintext password.</p>
+
+        <h2>4. Data and Privacy</h2>
+        <p>Your use of the Service is also governed by our Privacy Policy. You retain ownership of the numerical data and parameters you input into our tools. However, by using the platform, you grant us the right to store this data securely in our cloud database to ensure your profile loads seamlessly across sessions.</p>
+
+        <h2>5. Intellectual Property</h2>
+        <p>The Service and its original content, features, proprietary algorithms, and functionality are and will remain the exclusive property of The Market Technician. The Service is protected by copyright, trademark, and other laws. You may not copy, reverse-engineer, or distribute our proprietary calculators or user interfaces without prior written consent.</p>
+
+        <h2>6. Termination and Nuclear Deletion</h2>
+        <p>We may terminate or suspend your account and bar access to the Service immediately, without prior notice or liability, under our sole discretion, for any reason whatsoever, including a breach of these Terms.</p>
+        <p>You have the right to permanently erase your account and all associated data at any time using the "Delete Account Permanently" function in your dashboard. This action is irreversible.</p>
+
+        <a href="index.html" class="btn-back">Back to Portal</a>
+    </div>
+
+    <script>
+        // Theme Toggle Logic
+        const themeBtn = document.getElementById('theme-toggle-btn');
+        const htmlElement = document.documentElement;
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+
+        if (htmlElement.getAttribute('data-theme') === 'dark') {
+            moonIcon.classList.add('hidden');
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeBtn.addEventListener('click', () => {
+            const currentTheme = htmlElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            htmlElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('mt-theme', newTheme);
+
+            if (newTheme === 'dark') {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+            } else {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

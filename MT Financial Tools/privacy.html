@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy | The Market Technician</title>
+    
+    <script>
+        // Inherit the user's theme preference from the main portal
+        const savedTheme = localStorage.getItem('mt-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        /* Exact CSS Variables from your Main Portal */
+        :root {
+            --board-bg: #e2e8f0; 
+            --panel-bg: #f1f5f9; 
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #cbd5e1;
+            --input-bg: #e2e8f0;
+            
+            --panel-shadow: 20px 20px 60px #c1c6cc, -20px -20px 60px #ffffff;
+            --button-shadow: 6px 6px 12px #c8ccd2, -6px -6px 12px #ffffff;
+            --button-pressed-shadow: inset 6px 6px 12px #c8ccd2, inset -6px -6px 12px #ffffff;
+
+            --brand-green: #63AC2A;
+            --brand-green-hover: #529122;
+            --brand-green-glow: rgba(99, 172, 42, 0.4);
+            
+            --danger-red: #ef4444;
+            
+            --wave-opacity: 0.04;
+        }
+
+        [data-theme="dark"] {
+            --board-bg: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --input-bg: #0f172a;
+            
+            --panel-shadow: 20px 20px 60px #0d1424, -20px -20px 60px #111a30;
+            --button-shadow: 6px 6px 12px #151d2a, -6px -6px 12px #27354c;
+            --button-pressed-shadow: inset 6px 6px 12px #151d2a, inset -6px -6px 12px #27354c;
+            
+            --wave-opacity: 0.02;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--board-bg);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px 20px;
+            overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        /* Subtle Wave Background */
+        body::before, body::after {
+            content: ''; position: fixed; z-index: -1; background: var(--brand-green);
+            opacity: var(--wave-opacity); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+            transition: opacity 0.3s ease; animation: waveFlow 25s infinite linear;
+        }
+        body::before { width: 150vw; height: 150vw; top: -75vw; left: -50vw; }
+        body::after { width: 100vw; height: 100vw; bottom: -40vw; right: -20vw; animation-direction: reverse; animation-duration: 35s; }
+        @keyframes waveFlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Hardware Toggle Switch */
+        .theme-toggle {
+            position: fixed; top: 20px; right: 20px; background: var(--panel-bg);
+            border: none; border-radius: 50%; width: 48px; height: 48px;
+            display: flex; justify-content: center; align-items: center;
+            color: var(--text-main); cursor: pointer; box-shadow: var(--button-shadow);
+            transition: all 0.2s ease; z-index: 100;
+        }
+        .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
+        .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
+        .hidden { display: none !important; }
+
+        /* Document Container */
+        .document-container {
+            background: var(--panel-bg);
+            padding: 50px 60px;
+            border-radius: 24px;
+            box-shadow: var(--panel-shadow);
+            width: 100%;
+            max-width: 800px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Fake Screws */
+        .document-container::before, .document-container::after {
+            content: ''; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--panel-bg);
+            box-shadow: inset 2px 2px 4px rgba(0,0,0,0.2), inset -2px -2px 4px rgba(255,255,255,0.7);
+        }
+        .document-container::before { top: 20px; left: 20px; }
+        .document-container::after { top: 20px; right: 20px; }
+
+        /* Typography optimized for reading */
+        h1 { font-size: 28px; font-weight: 800; margin-top: 0; margin-bottom: 8px; color: var(--text-main); }
+        .last-updated { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 40px; display: block; }
+        
+        h2 { font-size: 18px; font-weight: 700; color: var(--brand-green); margin-top: 40px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;}
+        
+        p, li { font-size: 15px; color: var(--text-muted); line-height: 1.7; margin-bottom: 16px; font-weight: 500; }
+        ul { margin-bottom: 24px; padding-left: 20px;}
+        strong { color: var(--text-main); }
+
+        /* Back Button */
+        .btn-back {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 100%; padding: 16px; background-color: var(--brand-green);
+            color: white; font-weight: 700; font-size: 16px; text-decoration: none;
+            border-radius: 12px; margin-top: 40px; box-shadow: 4px 4px 8px rgba(99, 172, 42, 0.3), -4px -4px 8px rgba(255,255,255,0.1);
+            transition: all 0.15s ease; text-align: center;
+        }
+        .btn-back:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); transform: translateY(2px); }
+
+        @media (max-width: 600px) {
+            .document-container { padding: 40px 24px; }
+            h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+    <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle Dark Mode">
+        <svg id="moon-icon" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+        </svg>
+        <svg id="sun-icon" class="hidden" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5" fill="currentColor"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+        </svg>
+    </button>
+
+    <div class="document-container">
+        
+        <h1>Privacy Policy</h1>
+        <span class="last-updated">Last Updated: April 2026</span>
+
+        <p><strong>The Market Technician</strong>, as a collective entity, we are committed to protecting your personal information. This Privacy Policy outlines how we collect, use, and protect your data in compliance with the Data Privacy Act of 2012 (Republic Act No. 10173) of the Philippines.</p>
+
+        <h2>1. Information We Collect</h2>
+        <p>When you use our Service, we collect the following types of information:</p>
+        <ul>
+            <li><strong>Authentication Data:</strong> Your email address and a securely hashed version of your password when you create an account.</li>
+            <li><strong>Financial Sandbox Data:</strong> Numerical inputs, risk parameters, and portfolio simulations you enter into our tools (e.g., Wealth Sandbox, Strike Planner).</li>
+            <li><strong>Payment Verification Data:</strong> Information you submit via our Google Forms payment portal, which may include your name, contact details, and screenshots of payment receipts (GCash, Bank Transfer) required to unlock Premium access.</li>
+        </ul>
+
+        <h2>2. How We Use Your Information</h2>
+        <p>We use your data exclusively to provide and improve the Service:</p>
+        <ul>
+            <li>To authenticate your identity and secure your account.</li>
+            <li>To save your financial parameters so your sandbox environments load seamlessly when you return.</li>
+            <li>To verify your subscription tier (Trial vs. Premium) and manage your access expiration dates.</li>
+            <li>To communicate essential account updates, such as password resets.</li>
+        </ul>
+
+        <h2>3. Data Storage and Third-Party Services</h2>
+        <p>We do not sell, rent, or trade your personal data. We rely on enterprise-grade third-party infrastructure to secure your information:</p>
+        <ul>
+            <li><strong>Google Firebase:</strong> Your authentication credentials and sandbox data are stored in Google Firebase Firestore. Firebase utilizes industry-standard encryption protocols to protect your data at rest and in transit.</li>
+            <li><strong>Google Workspace:</strong> Payment verification submissions are securely processed and stored within our private Google Sheets environment.</li>
+        </ul>
+
+        <h2>4. Your Data Privacy Rights</h2>
+        <p>Under the Data Privacy Act of 2012, you possess strict rights regarding your personal data. The Market Technician empowers you to exercise these rights directly within the app:</p>
+        <ul>
+            <li><strong>The Right to Erasure:</strong> You have the right to demand the total erasure of your data. We have built a "Nuclear Delete" feature into your user dashboard. Using this function will permanently erase your Authentication profile and all associated sandbox data from our Firebase servers. <strong>This action cannot be undone.</strong></li>
+            <li><strong>The Right to Access & Rectification:</strong> You may update your financial parameters at any time by simply overriding the inputs in the sandboxes.</li>
+        </ul>
+
+        <h2>5. Security of Your Data</h2>
+        <p>While we use commercially acceptable means to protect your Personal Data, remember that no method of transmission over the Internet is 100% secure. You are responsible for maintaining the confidentiality of your password. We will never ask for your password via email or customer support.</p>
+
+        <h2>6. Changes to This Privacy Policy</h2>
+        <p>We may update our Privacy Policy from time to time. We will notify you of any changes by updating the "Last Updated" date at the top of this document. You are advised to review this Privacy Policy periodically for any changes.</p>
+
+        <h2>7. Contact Us</h2>
+        <p>If you have any questions about this Privacy Policy or wish to exercise your data privacy rights, please contact us at: <strong>themarkettechnician099@gmail.com</strong>.</p>
+
+        <a href="index.html" class="btn-back">Back to Portal</a>
+    </div>
+
+    <script>
+        // Theme Toggle Logic
+        const themeBtn = document.getElementById('theme-toggle-btn');
+        const htmlElement = document.documentElement;
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+
+        if (htmlElement.getAttribute('data-theme') === 'dark') {
+            moonIcon.classList.add('hidden');
+            sunIcon.classList.remove('hidden');
+        }
+
+        themeBtn.addEventListener('click', () => {
+            const currentTheme = htmlElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            htmlElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('mt-theme', newTheme);
+
+            if (newTheme === 'dark') {
+                moonIcon.classList.add('hidden');
+                sunIcon.classList.remove('hidden');
+            } else {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
