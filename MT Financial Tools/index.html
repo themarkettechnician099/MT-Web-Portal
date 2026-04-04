@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MT Financial Tools | Portal</title>
+    
+    <script>
+        const savedTheme = localStorage.getItem('mt-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+
     <style>
         /* Import Inter Font */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -233,7 +239,7 @@
         
         .forgot-password:hover { opacity: 0.8; text-decoration: underline; }
 
-        /* Crisp Custom Checkbox */
+        /* CRISP CHECKBOX FIX: Stripped native styling completely */
         .legal-check {
             display: flex;
             align-items: flex-start;
@@ -255,12 +261,11 @@
             min-width: 18px;
             margin: 2px 0 0 0;
             background-color: var(--input-bg);
-            border: 1px solid var(--border-color);
+            border: 2px solid var(--border-color);
             border-radius: 4px;
             cursor: pointer;
             position: relative;
-            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
-            transition: all 0.2s ease;
+            outline: none;
         }
 
         .legal-check input:checked {
@@ -268,12 +273,12 @@
             border-color: var(--brand-green);
         }
 
-        /* The Custom Checkmark */
+        /* Pure CSS white checkmark */
         .legal-check input:checked::after {
             content: '';
             position: absolute;
-            left: 5px;
-            top: 2px;
+            left: 4px;
+            top: 1px;
             width: 4px;
             height: 8px;
             border: solid white;
@@ -497,7 +502,7 @@
             <div class="progress-track">
                 <div id="loading-progress"></div>
             </div>
-            <span class="loading-text animate-pulse">Initializing Environment...</span>
+            <span id="loading-text" class="loading-text animate-pulse">Initializing Environment...</span>
         </div>
     </div>
 
@@ -667,21 +672,31 @@
     </div>
 
     <script>
-        // Theme Toggle Logic
+        // NEW: Theme Toggle Logic (Now saves to Local Storage)
         const themeBtn = document.getElementById('theme-toggle-btn');
         const htmlElement = document.documentElement;
         const sunIcon = document.getElementById('sun-icon');
         const moonIcon = document.getElementById('moon-icon');
 
+        // Set the correct icon on initial load
+        if (htmlElement.getAttribute('data-theme') === 'dark') {
+            moonIcon.classList.add('hidden');
+            sunIcon.classList.remove('hidden');
+        }
+
         themeBtn.addEventListener('click', () => {
-            if (htmlElement.getAttribute('data-theme') === 'dark') {
-                htmlElement.setAttribute('data-theme', 'light');
-                sunIcon.classList.add('hidden');
-                moonIcon.classList.remove('hidden');
-            } else {
-                htmlElement.setAttribute('data-theme', 'dark');
+            const currentTheme = htmlElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            htmlElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('mt-theme', newTheme); // Save to memory!
+
+            if (newTheme === 'dark') {
                 moonIcon.classList.add('hidden');
                 sunIcon.classList.remove('hidden');
+            } else {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
             }
         });
 
