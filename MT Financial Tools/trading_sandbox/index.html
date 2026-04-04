@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MT Trading Portfolio Sandbox v2.15</title>
+
+    <script>
+        const savedTheme = localStorage.getItem('mt-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
