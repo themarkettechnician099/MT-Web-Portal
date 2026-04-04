@@ -246,14 +246,14 @@ signupBtn.addEventListener('click', () => {
         .then(async (userCredential) => {
             const user = userCredential.user;
             
-            // Calculate exactly 5 days from this moment
+            // Calculate exactly 1 day from this moment (PROMO OVERRIDE)
             const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + 5);
+            expiryDate.setDate(expiryDate.getDate() + 1);
 
-            // Build their database file with the trial tier and expiration
+            // Build their database file with FULL VIP access and 1-day expiration
             await setDoc(doc(db, "users", user.uid), {
                 email: user.email,
-                tier: "trial",
+                tier: "premium", // PROMO OVERRIDE
                 accessExpiresAt: expiryDate
             });
             
