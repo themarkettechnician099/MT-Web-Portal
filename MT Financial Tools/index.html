@@ -182,7 +182,44 @@
         .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
         .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
 
-        /* --- NEW CSS FOR PAYWALL, FORGOT PASSWORD, AND LEGAL --- */
+        /* --- UI OVERHAUL CSS: PASSWORD WRAPPER, CRISP CHECKBOX, TOGGLE --- */
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            box-shadow: none;
+            width: auto;
+        }
+
+        .toggle-password:active {
+            box-shadow: none;
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        .toggle-password:hover {
+            color: var(--brand-green);
+        }
+
+        .toggle-password svg {
+            width: 20px;
+            height: 20px;
+        }
+
         .forgot-password {
             font-size: 12px;
             color: var(--brand-green);
@@ -194,11 +231,9 @@
             transition: opacity 0.2s ease;
         }
         
-        .forgot-password:hover {
-            opacity: 0.8;
-            text-decoration: underline;
-        }
+        .forgot-password:hover { opacity: 0.8; text-decoration: underline; }
 
+        /* Crisp Custom Checkbox */
         .legal-check {
             display: flex;
             align-items: flex-start;
@@ -208,15 +243,42 @@
             text-align: left;
             margin-top: 4px;
             line-height: 1.4;
+            cursor: pointer;
+            user-select: none; /* Prevent text highlighting */
         }
 
         .legal-check input {
+            appearance: none;
+            -webkit-appearance: none;
             width: 18px;
             height: 18px;
+            min-width: 18px;
             margin: 2px 0 0 0;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
             cursor: pointer;
-            accent-color: var(--brand-green);
-            box-shadow: none;
+            position: relative;
+            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+
+        .legal-check input:checked {
+            background-color: var(--brand-green);
+            border-color: var(--brand-green);
+        }
+
+        /* The Custom Checkmark */
+        .legal-check input:checked::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 2px;
+            width: 4px;
+            height: 8px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
         }
 
         .legal-check a {
@@ -224,6 +286,29 @@
             text-decoration: underline;
             font-weight: 600;
         }
+
+        /* Auth Mode Toggle Link */
+        .auth-toggle-container {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 20px;
+            font-weight: 500;
+        }
+
+        .auth-toggle-container a {
+            color: var(--brand-green);
+            font-weight: 700;
+            text-decoration: none;
+            margin-left: 4px;
+            transition: opacity 0.2s ease;
+        }
+
+        .auth-toggle-container a:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+
+        /* --- END UI OVERHAUL CSS --- */
 
         .paywall-box {
             background-color: var(--input-bg);
@@ -252,16 +337,14 @@
             transition: opacity 0.2s ease;
         }
 
-        .btn-text-danger:hover {
-            opacity: 0.7;
-        }
+        .btn-text-danger:hover { opacity: 0.7; }
 
-        /* --- NEW CSS: NUCLEAR DELETE MODAL --- */
+        /* Nuclear Delete Modal */
         #delete-modal-overlay {
             position: fixed;
             inset: 0;
             z-index: 12000;
-            background-color: rgba(239, 68, 68, 0.15); /* Transparent Red Atmosphere */
+            background-color: rgba(239, 68, 68, 0.15); 
             backdrop-filter: blur(12px);
             display: flex;
             justify-content: center;
@@ -271,10 +354,7 @@
             transition: all 0.3s ease;
         }
 
-        #delete-modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
+        #delete-modal-overlay.active { opacity: 1; visibility: visible; }
 
         .delete-modal-box {
             background: var(--panel-bg);
@@ -289,84 +369,39 @@
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        #delete-modal-overlay.active .delete-modal-box {
-            transform: scale(1);
-        }
+        #delete-modal-overlay.active .delete-modal-box { transform: scale(1); }
 
         .delete-modal-box h2 {
-            color: var(--danger-red);
-            margin-top: 0;
-            margin-bottom: 12px;
-            font-size: 24px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            color: var(--danger-red); margin-top: 0; margin-bottom: 12px;
+            font-size: 24px; text-transform: uppercase; letter-spacing: 0.05em;
         }
 
-        .delete-modal-box p {
-            font-size: 14px;
-            margin-bottom: 24px;
-            color: var(--text-main);
-            line-height: 1.6;
-        }
+        .delete-modal-box p { font-size: 14px; margin-bottom: 24px; color: var(--text-main); line-height: 1.6; }
 
-        .delete-btn-group {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
+        .delete-btn-group { display: flex; gap: 12px; margin-top: 24px; }
 
         .btn-cancel {
-            background-color: var(--input-bg);
-            color: var(--text-main);
-            flex: 1;
-            padding: 16px;
-            border: none;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 15px;
-            cursor: pointer;
-            box-shadow: var(--button-shadow);
-            transition: all 0.2s ease;
+            background-color: var(--input-bg); color: var(--text-main); flex: 1;
+            padding: 16px; border: none; border-radius: 12px; font-weight: 700;
+            font-size: 15px; cursor: pointer; box-shadow: var(--button-shadow); transition: all 0.2s ease;
         }
 
-        .btn-cancel:active {
-            box-shadow: var(--button-pressed-shadow);
-            transform: translateY(2px);
-        }
+        .btn-cancel:active { box-shadow: var(--button-pressed-shadow); transform: translateY(2px); }
 
         .btn-confirm-delete {
-            background-color: var(--danger-red);
-            color: white;
-            flex: 1;
-            padding: 16px;
-            border: none;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 15px;
-            cursor: pointer;
-            box-shadow: 4px 4px 8px rgba(239, 68, 68, 0.3), -4px -4px 8px rgba(255,255,255,0.05);
-            transition: all 0.2s ease;
+            background-color: var(--danger-red); color: white; flex: 1;
+            padding: 16px; border: none; border-radius: 12px; font-weight: 700;
+            font-size: 15px; cursor: pointer; box-shadow: 4px 4px 8px rgba(239, 68, 68, 0.3), -4px -4px 8px rgba(255,255,255,0.05); transition: all 0.2s ease;
         }
 
-        .btn-confirm-delete:active {
-            box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2);
-            transform: translateY(2px);
-        }
-        /* --- END NEW CSS --- */
+        .btn-confirm-delete:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); transform: translateY(2px); }
 
         /* The Physical Panel */
         .container {
-            background: var(--panel-bg);
-            padding: 50px 40px;
-            border-radius: 24px;
-            box-shadow: var(--panel-shadow);
-            width: 100%;
-            max-width: 850px; 
-            text-align: center;
-            transition: all 0.3s ease;
-            position: relative;
-            border: 1px solid var(--border-color);
-            z-index: 10;
+            background: var(--panel-bg); padding: 50px 40px; border-radius: 24px;
+            box-shadow: var(--panel-shadow); width: 100%; max-width: 850px; 
+            text-align: center; transition: all 0.3s ease; position: relative;
+            border: 1px solid var(--border-color); z-index: 10;
         }
 
         /* Fake Screws in the Corners */
@@ -382,13 +417,8 @@
 
         /* Tactile Logo Shell */
         .tactile-logo {
-            background: none;
-            border: none;
-            padding: 0;
-            cursor: pointer;
-            display: inline-block;
-            margin-bottom: 24px;
-            outline: none;
+            background: none; border: none; padding: 0; cursor: pointer;
+            display: inline-block; margin-bottom: 24px; outline: none;
             transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
@@ -422,86 +452,34 @@
         .btn-secondary:active { box-shadow: var(--button-pressed-shadow); transform: translateY(2px); }
 
         .btn-danger {
-            background-color: var(--panel-bg);
-            color: var(--danger-red);
-            padding: 16px 32px;
-            border-radius: 12px;
-            border: 2px solid var(--danger-red);
-            font-weight: 700;
-            font-size: 15px;
-            cursor: pointer;
-            box-shadow: var(--danger-shadow);
-            transition: all 0.15s ease;
-            display: inline-block;
-            margin-top: 32px;
-            max-width: 300px;
+            background-color: var(--panel-bg); color: var(--danger-red);
+            padding: 16px 32px; border-radius: 12px; border: 2px solid var(--danger-red);
+            font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: var(--danger-shadow);
+            transition: all 0.15s ease; display: inline-block; margin-top: 32px; max-width: 300px;
         }
-
         .btn-danger:active {
-            box-shadow: var(--button-pressed-shadow);
-            transform: translateY(2px);
-            background-color: rgba(239, 68, 68, 0.1);
-            border-color: transparent;
+            box-shadow: var(--button-pressed-shadow); transform: translateY(2px);
+            background-color: rgba(239, 68, 68, 0.1); border-color: transparent;
         }
 
         /* The Physical App Grid */
-        .app-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 24px;
-            margin-top: 40px;
-            margin-bottom: 40px;
-        }
+        .app-grid { display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 40px; margin-bottom: 40px; }
+        @media (min-width: 640px) { .app-grid { grid-template-columns: repeat(2, 1fr); gap: 30px; } }
 
-        @media (min-width: 640px) {
-            .app-grid { grid-template-columns: repeat(2, 1fr); gap: 30px; }
-        }
-
-        /* The Chunky Buttons (Cards) */
         .app-card {
-            display: flex;
-            flex-direction: row;
-            align-items: flex-start;
-            gap: 20px;
-            padding: 24px;
-            background: var(--panel-bg);
-            text-decoration: none;
-            border-radius: 16px;
-            box-shadow: var(--button-shadow);
-            border: 2px solid transparent;
-            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            cursor: pointer;
+            display: flex; flex-direction: row; align-items: flex-start; gap: 20px; padding: 24px;
+            background: var(--panel-bg); text-decoration: none; border-radius: 16px;
+            box-shadow: var(--button-shadow); border: 2px solid transparent;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); position: relative; cursor: pointer;
         }
+        .app-card:hover { border-color: var(--brand-green); box-shadow: 0 0 20px var(--brand-green-glow), var(--button-shadow); }
+        .app-card:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.98) translateY(2px); border-color: transparent; }
 
-        /* Active/Hover State - The "Push" and "Glow" */
-        .app-card:hover {
-            border-color: var(--brand-green);
-            box-shadow: 0 0 20px var(--brand-green-glow), var(--button-shadow);
-        }
-
-        .app-card:active {
-            box-shadow: var(--button-pressed-shadow);
-            transform: scale(0.98) translateY(2px);
-            border-color: transparent;
-        }
-
-        /* The Icon Housing */
         .app-card-icon {
-            flex-shrink: 0;
-            width: 54px;
-            height: 54px;
-            border-radius: 12px; 
-            box-shadow: var(--button-pressed-shadow);
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            flex-shrink: 0; width: 54px; height: 54px; border-radius: 12px; 
+            box-shadow: var(--button-pressed-shadow); display: flex; justify-content: center; align-items: center;
         }
-
-        .app-card-icon img {
-            width: 32px; height: 32px; object-fit: contain;
-            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));
-        }
+        .app-card-icon img { width: 32px; height: 32px; object-fit: contain; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1)); }
 
         .app-card-content { display: flex; flex-direction: column; text-align: left; }
         .app-card h3 { margin: 0 0 8px 0; font-size: 17px; font-weight: 700; color: var(--text-main); }
@@ -539,21 +517,39 @@
                 <img src="logo.png" alt="Market Technician Logo" class="brand-logo" onerror="this.style.display='none'">
             </button>
             
-            <p>Sign in to access your account.</p>
+            <p id="auth-title">Sign in to access your account.</p>
             
             <form id="auth-form">
                 <input type="email" id="email" placeholder="Email Address" required>
-                <input type="password" id="password" placeholder="Password" required>
+                
+                <div class="password-wrapper">
+                    <input type="password" id="password" placeholder="Password" required>
+                    <button type="button" class="toggle-password" id="toggle-password-btn" tabindex="-1">
+                        <svg id="eye-icon-closed" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+                        </svg>
+                        <svg id="eye-icon-open" class="hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                    </button>
+                </div>
                 
                 <a href="#" id="forgot-password-link" class="forgot-password">Forgot Password?</a>
                 
-                <div class="legal-check">
+                <label class="legal-check hidden" id="legal-check-container">
                     <input type="checkbox" id="legal-checkbox">
                     <span>I have read and agree to the <a href="terms.html" target="_blank">Terms & Conditions</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>.</span>
-                </div>
+                </label>
 
                 <button type="submit" id="login-btn" class="btn-primary">Sign In</button>
-                <button type="button" id="signup-btn" class="btn-secondary">Create Account</button>
+                <button type="button" id="signup-btn" class="btn-primary hidden">Create Account</button>
+                
+                <div class="auth-toggle-container">
+                    <span id="auth-toggle-text">Don't have an account?</span>
+                    <a href="#" id="auth-toggle-link">Sign Up</a>
+                </div>
+
             </form>
             <div id="error-message"></div>
         </div>
@@ -671,6 +667,7 @@
     </div>
 
     <script>
+        // Theme Toggle Logic
         const themeBtn = document.getElementById('theme-toggle-btn');
         const htmlElement = document.documentElement;
         const sunIcon = document.getElementById('sun-icon');
@@ -685,6 +682,24 @@
                 htmlElement.setAttribute('data-theme', 'dark');
                 moonIcon.classList.add('hidden');
                 sunIcon.classList.remove('hidden');
+            }
+        });
+
+        // Eye Icon Toggle Logic
+        const togglePasswordBtn = document.getElementById('toggle-password-btn');
+        const passwordInput = document.getElementById('password');
+        const eyeIconClosed = document.getElementById('eye-icon-closed');
+        const eyeIconOpen = document.getElementById('eye-icon-open');
+
+        togglePasswordBtn.addEventListener('click', () => {
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIconClosed.classList.add('hidden');
+                eyeIconOpen.classList.remove('hidden');
+            } else {
+                passwordInput.type = 'password';
+                eyeIconOpen.classList.add('hidden');
+                eyeIconClosed.classList.remove('hidden');
             }
         });
     </script>
