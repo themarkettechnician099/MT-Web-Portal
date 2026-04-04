@@ -6,8 +6,18 @@
     <title>MT Trading Portfolio Sandbox v2.15</title>
 
     <script>
+        // 1. Read the global memory saved by the main portal
         const savedTheme = localStorage.getItem('mt-theme') || 'light';
+        
+        // 2. Apply for standard CSS apps (Portal, Legal pages)
         document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        // 3. Apply for Tailwind CSS apps (Trading Sandbox, etc.)
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
     </script>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
