@@ -6,11 +6,12 @@ import {
     signInWithEmailAndPassword, 
     onAuthStateChanged, 
     signOut,
-    sendPasswordResetEmail, // NEW: Forgot Password
-    deleteUser // NEW: Delete Account
+    sendPasswordResetEmail,
+    deleteUser,
+    EmailAuthProvider, // NEW: Required to verify password before deletion
+    reauthenticateWithCredential // NEW: Required to verify password before deletion
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-// NEW: Import Firestore Database functions to check the Paywall Wristband
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 // 2. YOUR FIREBASE CONFIGURATION
@@ -27,7 +28,6 @@ const firebaseConfig = {
 const loadingScreen = document.getElementById('loading-screen');
 const loadingProgress = document.getElementById('loading-progress');
 
-// 0.1s: Bar width transitions to 92%
 setTimeout(() => {
     if(loadingProgress) loadingProgress.style.width = '92%';
 }, 50);
@@ -35,44 +35,45 @@ setTimeout(() => {
 // 3. Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app); // NEW: Initialize the Database connection
+const db = getFirestore(app); 
 
 // 4. Get UI Elements
 const authSection = document.getElementById('auth-section');
 const dashboardSection = document.getElementById('dashboard-section');
-const paywallSection = document.getElementById('paywall-section'); // NEW
+const paywallSection = document.getElementById('paywall-section'); 
 const authForm = document.getElementById('auth-form');
 const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
 const loginBtn = document.getElementById('login-btn');
 const signupBtn = document.getElementById('signup-btn');
 const logoutBtn = document.getElementById('logout-btn');
-const paywallLogoutBtn = document.getElementById('paywall-logout-btn'); // NEW
+const paywallLogoutBtn = document.getElementById('paywall-logout-btn'); 
 const userEmailDisplay = document.getElementById('user-email');
 const errorMessage = document.getElementById('error-message');
-const legalCheckbox = document.getElementById('legal-checkbox'); // NEW
-const forgotPasswordLink = document.getElementById('forgot-password-link'); // NEW
-const deleteAccountBtn = document.getElementById('delete-account-btn'); // NEW
+const legalCheckbox = document.getElementById('legal-checkbox'); 
+const forgotPasswordLink = document.getElementById('forgot-password-link'); 
+const deleteAccountBtn = document.getElementById('delete-account-btn'); 
+
+// NEW: Delete Modal Elements
+const deleteModalOverlay = document.getElementById('delete-modal-overlay');
+const deletePasswordConfirm = document.getElementById('delete-password-confirm');
+const deleteErrorMessage = document.getElementById('delete-error-message');
+const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
 
 // 5. Monitor Auth State & Enforce Paywall (Phase 2 & Phase 4)
-onAuthStateChanged(auth, async (user) => { // Made async to await database checks
+onAuthStateChanged(auth, async (user) => { 
     
-    // 1.0s: Firebase finished loading data. Push to 100%
     if(loadingProgress) loadingProgress.style.width = '100%';
     
-    // 1.2s: Fade entire screen to 0 opacity
     setTimeout(() => {
         if(loadingScreen) loadingScreen.classList.add('fade-out');
     }, 400);
 
-    // Smart UI routing based on Auth State and Expiration Date
     if (user) {
-        // Step 1: Hide the login form immediately
         authSection.classList.add('hidden');
         userEmailDisplay.textContent = user.email;
 
         try {
-            // Step 2: Check the Vault for their VIP Wristband
             const docRef = doc(db, "users", user.uid);
             const docSnap = await getDoc(docRef);
 
@@ -80,36 +81,29 @@ onAuthStateChanged(auth, async (user) => { // Made async to await database check
 
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                // Check if accessExpiresAt exists in their file
                 if (data.accessExpiresAt) {
-                    // Convert Firebase Timestamp to a standard Javascript Date
                     const expiryDate = data.accessExpiresAt.toDate ? data.accessExpiresAt.toDate() : new Date(data.accessExpiresAt);
-                    
-                    // Step 3: Compare their expiration date to right now
                     if (expiryDate > new Date()) {
                         hasAccess = true;
                     }
                 }
             }
 
-            // Step 4: Route them based on the check
             if (hasAccess) {
                 paywallSection.classList.add('hidden');
-                dashboardSection.classList.remove('hidden'); // Show VIP Apps
+                dashboardSection.classList.remove('hidden'); 
             } else {
                 dashboardSection.classList.add('hidden');
-                paywallSection.classList.remove('hidden'); // Show Paywall Block
+                paywallSection.classList.remove('hidden'); 
             }
 
         } catch (error) {
             console.error("Error checking access expiration:", error);
-            // Security fallback: If the database fails to read, lock the doors.
             dashboardSection.classList.add('hidden');
             paywallSection.classList.remove('hidden'); 
         }
 
     } else {
-        // User is logged out. Show Login, hide everything else.
         authSection.classList.remove('hidden');
         dashboardSection.classList.add('hidden');
         paywallSection.classList.add('hidden');
@@ -117,13 +111,12 @@ onAuthStateChanged(auth, async (user) => { // Made async to await database check
     }
 });
 
-// 6. Handle Login (With UI Feedback)
+// 6. Handle Login
 authForm.addEventListener('submit', (e) => {
     e.preventDefault(); 
     errorMessage.textContent = ""; 
-    errorMessage.style.color = "var(--danger-red)"; // Reset color
+    errorMessage.style.color = "var(--danger-red)"; 
     
-    // UI Feedback: "Syncing..." effect
     const originalText = loginBtn.textContent;
     loginBtn.textContent = "Authenticating...";
     
@@ -133,15 +126,14 @@ authForm.addEventListener('submit', (e) => {
     signInWithEmailAndPassword(auth, email, password)
         .catch((error) => {
             errorMessage.textContent = "Invalid email or password.";
-            loginBtn.textContent = originalText; // Revert on fail
+            loginBtn.textContent = originalText; 
         });
-    // On success, onAuthStateChanged takes over.
 });
 
-// 7. Handle Sign Up (With UI Feedback & Legal Check)
+// 7. Handle Sign Up
 signupBtn.addEventListener('click', () => {
     errorMessage.textContent = "";
-    errorMessage.style.color = "var(--danger-red)"; // Reset color
+    errorMessage.style.color = "var(--danger-red)"; 
     
     const email = emailInput.value;
     const password = passwordInput.value;
@@ -151,13 +143,11 @@ signupBtn.addEventListener('click', () => {
         return;
     }
 
-    // NEW: The Legal Gatekeeper
     if(!legalCheckbox.checked) {
         errorMessage.textContent = "You must agree to the Terms & Conditions and Privacy Policy to create an account.";
         return;
     }
 
-    // UI Feedback: "Syncing..." effect
     const originalText = signupBtn.textContent;
     signupBtn.textContent = "Creating Account...";
 
@@ -170,11 +160,11 @@ signupBtn.addEventListener('click', () => {
             } else {
                 errorMessage.textContent = error.message;
             }
-            signupBtn.textContent = originalText; // Revert on fail
+            signupBtn.textContent = originalText; 
         });
 });
 
-// 8. Handle Forgot Password (NEW)
+// 8. Handle Forgot Password
 forgotPasswordLink.addEventListener('click', (e) => {
     e.preventDefault();
     errorMessage.textContent = "";
@@ -188,7 +178,7 @@ forgotPasswordLink.addEventListener('click', (e) => {
 
     sendPasswordResetEmail(auth, email)
         .then(() => {
-            errorMessage.style.color = "var(--brand-green)"; // Turn text green for success
+            errorMessage.style.color = "var(--brand-green)"; 
             errorMessage.textContent = "Password reset email sent! Please check your inbox.";
         })
         .catch((error) => {
@@ -206,25 +196,52 @@ paywallLogoutBtn.addEventListener('click', () => {
     signOut(auth).catch((error) => console.error("Logout Error:", error));
 });
 
-// 10. Handle Delete Account (NEW)
+// 10. Handle Delete Account (NUCLEAR LOCK)
+// Step 1: Trigger the Modal
 deleteAccountBtn.addEventListener('click', () => {
+    deleteErrorMessage.textContent = ""; // Clear any old errors
+    deletePasswordConfirm.value = ""; // Clear old password inputs
+    deleteModalOverlay.classList.add('active'); // Turn on the red atmosphere
+});
+
+// Step 2: Process the Deletion
+confirmDeleteBtn.addEventListener('click', async () => {
     const user = auth.currentUser;
-    if (user) {
-        // High-friction warning to prevent accidental deletions
-        if(confirm("Are you absolutely sure you want to permanently delete your account? This will permanently erase your VIP access and all your saved portfolio data. This cannot be undone.")) {
-            
-            deleteUser(user).then(() => {
-                alert("Your account has been permanently deleted.");
-                // onAuthStateChanged will automatically kick them back to login
-            }).catch((error) => {
-                console.error("Error deleting user:", error);
-                // Firebase requires a "recent login" to delete an account for security
-                if (error.code === 'auth/requires-recent-login') {
-                    alert("For security reasons, Firebase requires you to log out and log back in immediately before deleting your account.");
-                } else {
-                    alert("An error occurred: " + error.message);
-                }
-            });
+    const password = deletePasswordConfirm.value;
+
+    if (!user) return;
+
+    if (!password) {
+        deleteErrorMessage.textContent = "You must enter your password to proceed.";
+        return;
+    }
+
+    // UI Feedback
+    const originalText = confirmDeleteBtn.textContent;
+    confirmDeleteBtn.textContent = "Erasing Data...";
+
+    try {
+        // Build the security credential using their current email and the password they just typed
+        const credential = EmailAuthProvider.credential(user.email, password);
+
+        // Force Firebase to verify the password against their servers
+        await reauthenticateWithCredential(user, credential);
+
+        // If the code reaches this line, the password was a perfect match. Incinerate the account.
+        await deleteUser(user);
+
+        // Clean up the UI
+        deleteModalOverlay.classList.remove('active');
+        alert("Your account and all associated data have been permanently erased.");
+        // The onAuthStateChanged listener will automatically detect they are gone and kick them to the login screen.
+
+    } catch (error) {
+        // If the code jumps here, the password was wrong (or another error occurred)
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+            deleteErrorMessage.textContent = "Incorrect password. Deletion aborted.";
+        } else {
+            deleteErrorMessage.textContent = "An error occurred: " + error.message;
         }
+        confirmDeleteBtn.textContent = originalText; // Reset button text
     }
 });
