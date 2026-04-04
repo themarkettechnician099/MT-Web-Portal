@@ -182,6 +182,81 @@
         .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
         .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
 
+        /* --- NEW CSS FOR PAYWALL, FORGOT PASSWORD, AND LEGAL --- */
+        .forgot-password {
+            font-size: 12px;
+            color: var(--brand-green);
+            text-align: right;
+            margin-top: -8px;
+            margin-bottom: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: opacity 0.2s ease;
+        }
+        
+        .forgot-password:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+
+        .legal-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: left;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .legal-check input {
+            width: 18px;
+            height: 18px;
+            margin: 2px 0 0 0;
+            cursor: pointer;
+            accent-color: var(--brand-green);
+            box-shadow: none;
+        }
+
+        .legal-check a {
+            color: var(--brand-green);
+            text-decoration: underline;
+            font-weight: 600;
+        }
+
+        .paywall-box {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            text-align: left;
+            font-size: 14px;
+            color: var(--text-muted);
+            box-shadow: var(--button-pressed-shadow);
+            line-height: 1.6;
+        }
+
+        .btn-text-danger {
+            background: none;
+            border: none;
+            color: var(--danger-red);
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: underline;
+            cursor: pointer;
+            padding: 10px;
+            margin-top: 16px;
+            box-shadow: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .btn-text-danger:hover {
+            opacity: 0.7;
+        }
+        /* --- END NEW CSS --- */
+
         /* The Physical Panel */
         .container {
             background: var(--panel-bg);
@@ -206,7 +281,7 @@
         .container::before { top: 20px; left: 20px; }
         .container::after { top: 20px; right: 20px; }
 
-        #auth-section { max-width: 400px; margin: 0 auto; }
+        #auth-section, #paywall-section { max-width: 400px; margin: 0 auto; }
 
         /* Tactile Logo Shell */
         .tactile-logo {
@@ -235,38 +310,6 @@
         }
         input:focus { outline: none; border-color: var(--brand-green); box-shadow: 0 0 0 2px var(--brand-green-glow), var(--button-pressed-shadow); }
         input::placeholder { color: var(--text-muted); }
-
-        /* Password Visibility Toggle */
-        .password-container {
-            position: relative;
-            width: 100%;
-        }
-        
-        .toggle-password-btn {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            padding: 0;
-            width: auto;
-            color: var(--text-muted);
-            cursor: pointer;
-            box-shadow: none !important; 
-            transition: color 0.2s ease;
-        }
-
-        .toggle-password-btn:hover {
-            color: var(--text-main);
-            background: none;
-        }
-
-        .toggle-password-btn:active {
-            box-shadow: none !important;
-            transform: translateY(-50%) scale(0.9);
-            background: none;
-        }
 
         button {
             width: 100%; padding: 16px; border: none; border-radius: 12px;
@@ -403,19 +446,37 @@
             
             <form id="auth-form">
                 <input type="email" id="email" placeholder="Email Address" required>
+                <input type="password" id="password" placeholder="Password" required>
                 
-                <div class="password-container">
-                    <input type="password" id="password" placeholder="Password" required>
-                    <button type="button" id="toggle-password" class="toggle-password-btn" aria-label="Toggle password visibility">
-                        <svg id="eye-open" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                        <svg id="eye-closed" class="hidden" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-                    </button>
+                <a href="#" id="forgot-password-link" class="forgot-password">Forgot Password?</a>
+                
+                <div class="legal-check">
+                    <input type="checkbox" id="legal-checkbox">
+                    <span>I have read and agree to the <a href="terms.html" target="_blank">Terms & Conditions</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>.</span>
                 </div>
 
                 <button type="submit" id="login-btn" class="btn-primary">Sign In</button>
                 <button type="button" id="signup-btn" class="btn-secondary">Create Account</button>
             </form>
             <div id="error-message"></div>
+        </div>
+
+        <div id="paywall-section" class="hidden">
+            <button class="tactile-logo" onclick="window.location.reload()">
+                <img src="logo.png" alt="Market Technician Logo" class="brand-logo" onerror="this.style.display='none'">
+            </button>
+            
+            <h2 style="color: var(--text-main); margin-top: 0; margin-bottom: 8px;">Access Restricted</h2>
+            <p>Your subscription is pending or has expired.</p>
+            
+            <div class="paywall-box">
+                <strong style="color: var(--text-main);">To activate your VIP access:</strong><br><br>
+                1. Send payment via GCash or Bank Transfer.<br>
+                2. Email your receipt to: <strong>admin@the-market-technician.com</strong><br>
+                3. Your account will be manually unlocked within 24 hours.
+            </div>
+
+            <button id="paywall-logout-btn" class="btn-secondary">Log Out</button>
         </div>
 
         <div id="dashboard-section" class="hidden">
@@ -487,7 +548,12 @@
                 </a>
             </div>
 
-            <button id="logout-btn" class="btn-danger">Disconnect / Log Out</button>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <button id="logout-btn" class="btn-danger">Disconnect / Log Out</button>
+                
+                <button id="delete-account-btn" class="btn-text-danger">Delete Account Permanently</button>
+            </div>
+            
         </div>
     </div>
 
@@ -508,22 +574,6 @@
                 sunIcon.classList.remove('hidden');
             }
         });
-
-        // Handle Password Visibility Toggle
-        const togglePasswordBtn = document.getElementById('toggle-password');
-        const passwordInput = document.getElementById('password');
-        const eyeOpen = document.getElementById('eye-open');
-        const eyeClosed = document.getElementById('eye-closed');
-
-        if (togglePasswordBtn && passwordInput) {
-            togglePasswordBtn.addEventListener('click', () => {
-                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                passwordInput.setAttribute('type', type);
-                
-                eyeOpen.classList.toggle('hidden');
-                eyeClosed.classList.toggle('hidden');
-            });
-        }
     </script>
 
     <script type="module" src="app.js"></script>
