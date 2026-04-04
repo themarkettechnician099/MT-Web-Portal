@@ -89,25 +89,38 @@ authToggleLink.addEventListener('click', (e) => {
     isSignUpMode = !isSignUpMode;
     errorMessage.textContent = ""; // Clear errors on flip
 
+    // 1. Drop the curtain based on destination
     if (isSignUpMode) {
-        // Switch to Sign Up View
-        authTitle.textContent = "Create your account.";
-        loginBtn.classList.add('hidden');
-        forgotPasswordLink.classList.add('hidden');
-        signupBtn.classList.remove('hidden');
-        legalCheckContainer.classList.remove('hidden');
-        authToggleText.textContent = "Already have an account?";
-        authToggleLink.textContent = "Log In";
+        dropCurtain("Loading Registration...");
     } else {
-        // Switch to Sign In View
-        authTitle.textContent = "Sign in to access your account.";
-        signupBtn.classList.add('hidden');
-        legalCheckContainer.classList.add('hidden');
-        loginBtn.classList.remove('hidden');
-        forgotPasswordLink.classList.remove('hidden');
-        authToggleText.textContent = "Don't have an account?";
-        authToggleLink.textContent = "Sign Up";
+        dropCurtain("Loading Secure Login...");
     }
+
+    // 2. Wait for the curtain to fall (600ms), flip the UI, then lift it!
+    setTimeout(() => {
+        if (isSignUpMode) {
+            // Switch to Sign Up View
+            authTitle.textContent = "Create your account.";
+            loginBtn.classList.add('hidden');
+            forgotPasswordLink.classList.add('hidden');
+            signupBtn.classList.remove('hidden');
+            legalCheckContainer.classList.remove('hidden');
+            authToggleText.textContent = "Already have an account?";
+            authToggleLink.textContent = "Log In";
+        } else {
+            // Switch to Sign In View
+            authTitle.textContent = "Sign in to access your account.";
+            signupBtn.classList.add('hidden');
+            legalCheckContainer.classList.add('hidden');
+            loginBtn.classList.remove('hidden');
+            forgotPasswordLink.classList.remove('hidden');
+            authToggleText.textContent = "Don't have an account?";
+            authToggleLink.textContent = "Sign Up";
+        }
+        
+        // Lift the curtain
+        if(loadingScreen) loadingScreen.classList.add('fade-out');
+    }, 600); 
 });
 
 // 5. Monitor Auth State & Enforce Paywall
@@ -181,7 +194,7 @@ authForm.addEventListener('submit', (e) => {
     const email = emailInput.value;
     const password = passwordInput.value;
 
-    // NEW: Drop the curtain immediately!
+    // Drop the curtain immediately!
     dropCurtain("Authenticating Credentials...");
 
     signInWithEmailAndPassword(auth, email, password)
@@ -210,7 +223,7 @@ signupBtn.addEventListener('click', () => {
         return;
     }
 
-    // NEW: Drop the curtain immediately!
+    // Drop the curtain immediately!
     dropCurtain("Provisioning Secure Workspace...");
 
     createUserWithEmailAndPassword(auth, email, password)
@@ -252,11 +265,17 @@ forgotPasswordLink.addEventListener('click', (e) => {
 
 // 9. Handle Logouts
 logoutBtn.addEventListener('click', () => {
-    signOut(auth).catch((error) => console.error("Logout Error:", error));
+    dropCurtain("Disconnecting Secure Session...");
+    setTimeout(() => {
+        signOut(auth).catch((error) => console.error("Logout Error:", error));
+    }, 800);
 });
 
 paywallLogoutBtn.addEventListener('click', () => {
-    signOut(auth).catch((error) => console.error("Logout Error:", error));
+    dropCurtain("Disconnecting Secure Session...");
+    setTimeout(() => {
+        signOut(auth).catch((error) => console.error("Logout Error:", error));
+    }, 800);
 });
 
 // 10. Handle Delete Account (NUCLEAR LOCK)
