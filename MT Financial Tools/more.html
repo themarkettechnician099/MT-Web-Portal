@@ -89,11 +89,11 @@
         .bg-animation-wrapper::after { width: 100vw; height: 100vw; bottom: -20vw; right: -10vw; animation-direction: reverse; animation-duration: 35s; }
         @keyframes waveFlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Hardware Toggle Switch (Bulletproof Fixed) */
+        /* Hardware Toggle Switch (Anchored to Background) */
         .theme-toggle {
-            position: fixed; 
-            top: 20px; 
-            right: 20px; 
+            position: absolute; /* This anchors it to the background so it scrolls away */
+            top: 30px; 
+            right: 30px; 
             background: var(--panel-bg);
             border: none; 
             border-radius: 50%; 
@@ -106,13 +106,13 @@
             cursor: pointer; 
             box-shadow: var(--button-shadow);
             transition: all 0.2s ease; 
-            z-index: 9999;
+            z-index: 100;
         }
         
         .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
         .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
         .hidden { display: none !important; }
-
+        
         /* Main Container */
         .container {
             background: var(--panel-bg);
