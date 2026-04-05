@@ -100,6 +100,29 @@
         .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
         .hidden { display: none !important; }
 
+        /* Hardware Toggle Switch (Anchored to Background to match index.html) */
+        .theme-toggle {
+            position: absolute; 
+            top: 20px; 
+            right: 30px; 
+            background: var(--panel-bg);
+            border: none; 
+            border-radius: 50%; 
+            width: 48px; 
+            height: 48px;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            color: var(--text-main); 
+            cursor: pointer; 
+            box-shadow: var(--button-shadow);
+            transition: all 0.2s ease; 
+            z-index: 100;
+        }
+        .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
+        .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
+        .hidden { display: none !important; }
+
         /* Document Container */
         .document-container {
             background: var(--panel-bg);
@@ -107,7 +130,7 @@
             border-radius: 24px;
             box-shadow: var(--panel-shadow);
             width: 100%;
-            max-width: 800px;
+            max-width: 800px; /* Wider for reading */
             border: 1px solid var(--border-color);
             position: relative;
             z-index: 10;
@@ -131,6 +154,15 @@
         ul { margin-bottom: 24px; padding-left: 20px;}
         strong { color: var(--text-main); }
 
+        .disclaimer-box {
+            background-color: rgba(239, 68, 68, 0.05);
+            border-left: 4px solid var(--danger-red);
+            padding: 20px;
+            border-radius: 0 12px 12px 0;
+            margin: 32px 0;
+        }
+        .disclaimer-box p { color: var(--text-main); margin-bottom: 0; font-weight: 600; }
+
         /* Back Button */
         .btn-back {
             display: inline-flex; align-items: center; justify-content: center;
@@ -141,11 +173,12 @@
         }
         .btn-back:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); transform: translateY(2px); }
 
-       @media (max-width: 600px) {
+        @media (max-width: 600px) {
             body { padding-top: 80px; } /* Pushes the entire box down on mobile only */
             .container { padding: 40px 24px; }
             .content-block { padding: 24px; }
         }
+        
     </style>
 </head>
 <body>
