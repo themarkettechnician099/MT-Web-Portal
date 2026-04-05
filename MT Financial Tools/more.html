@@ -73,14 +73,26 @@
         body::after { width: 100vw; height: 100vw; bottom: -40vw; right: -20vw; animation-direction: reverse; animation-duration: 35s; }
         @keyframes waveFlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Hardware Toggle Switch */
+        /* Hardware Toggle Switch (Fixed Patch) */
         .theme-toggle {
-            position: fixed; top: 20px; right: 20px; background: var(--panel-bg);
-            border: none; border-radius: 50%; width: 48px; height: 48px;
-            display: flex; justify-content: center; align-items: center;
-            color: var(--text-main); cursor: pointer; box-shadow: var(--button-shadow);
-            transition: all 0.2s ease; z-index: 100;
+            position: fixed; /* This pins it to the glass of the screen, not the document */
+            top: 20px; 
+            right: 20px; 
+            background: var(--panel-bg);
+            border: none; 
+            border-radius: 50%; 
+            width: 48px; 
+            height: 48px;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            color: var(--text-main); 
+            cursor: pointer; 
+            box-shadow: var(--button-shadow);
+            transition: all 0.2s ease; 
+            z-index: 9999; /* Boosted to ensure it always floats above the text */
         }
+        
         .theme-toggle:active { box-shadow: var(--button-pressed-shadow); transform: scale(0.95); }
         .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
         .hidden { display: none !important; }
