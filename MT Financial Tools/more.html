@@ -48,11 +48,7 @@
             --wave-opacity: 0.02;
         }
 
-        /* New HTML rule to prevent mobile scrolling bugs */
-        html {
-            overflow-x: hidden;
-        }
-        
+     
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--board-bg);
@@ -66,8 +62,35 @@
             /* REMOVED: overflow-x: hidden; */
             transition: background-color 0.3s ease, color 0.3s ease;
             box-sizing: border-box;
+            position:relative;
         }
 
+        /* BULLETPROOF BACKGROUND WAVES */
+        .bg-animation-wrapper {
+            position: fixed;
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh;
+            overflow: hidden; /* We hide the overflow HERE instead of the body */
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        .bg-animation-wrapper::before, .bg-animation-wrapper::after {
+            content: ''; 
+            position: absolute; 
+            background: var(--brand-green);
+            opacity: var(--wave-opacity); 
+            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+            transition: opacity 0.3s ease; 
+            animation: waveFlow 25s infinite linear;
+        }
+        
+        .bg-animation-wrapper::before { width: 150vw; height: 150vw; top: -25vw; left: -25vw; }
+        .bg-animation-wrapper::after { width: 100vw; height: 100vw; bottom: -20vw; right: -10vw; animation-direction: reverse; animation-duration: 35s; }
+        @keyframes waveFlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
         /* Subtle Wave Background */
         body::before, body::after {
             content: ''; position: fixed; z-index: -1; background: var(--brand-green);
@@ -218,6 +241,7 @@
     </style>
 </head>
 <body>
+     <div class="bg-animation-wrapper"></div>
 
     <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle Dark Mode">
         <svg id="moon-icon" viewBox="0 0 24 24">
