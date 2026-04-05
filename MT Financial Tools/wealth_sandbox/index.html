@@ -259,6 +259,43 @@
 
         </div>
     </main>
+    
 <script type="module" src="engine.js"></script>
+
+    <script>
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (typeof firebase === 'undefined') return;
+
+                firebase.auth().onAuthStateChanged(async (user) => {
+                    if (!user) {
+                        // Not logged in? Kick them out.
+                        window.location.href = '../index.html';
+                        return;
+                    }
+                    
+                    try {
+                        const db = firebase.firestore();
+                        const docRef = await db.collection("users").doc(user.uid).get();
+                        
+                        if (docRef.exists) {
+                            const data = docRef.data();
+                            const isExpired = data.accessExpiresAt && data.accessExpiresAt.toDate() < new Date();
+                            
+                            // Free room: Only kick them out if their clock has run out!
+                            if (isExpired) {
+                                window.location.href = '../index.html';
+                            }
+                        } else {
+                            window.location.href = '../index.html';
+                        }
+                    } catch (error) {
+                        console.error("Security Check Failed:", error);
+                        window.location.href = '../index.html';
+                    }
+                });
+            }, 500); 
+        });
+    </script>
 </body>
 </html>
