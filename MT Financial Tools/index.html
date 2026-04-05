@@ -418,14 +418,22 @@
             transition: opacity 0.5s ease, visibility 0.5s ease;
         }
 
-        /* Subtle theme-aware tint over your background art for readability */
+       /* Subtle theme-aware vignette over your background art */
         .welcome-bg-overlay {
             position: absolute;
             inset: 0;
-            background-color: var(--board-bg);
-            opacity: 0.6; 
-            backdrop-filter: blur(4px);
+            /* Creates a vignette: clearer in the center to highlight the logo, dark navy at the edges */
+            background: radial-gradient(circle, rgba(15,23,42,0.3) 0%, rgba(15,23,42,0.95) 100%);
+            backdrop-filter: blur(2px);
             z-index: -1;
+            /* The cinematic breathing effect */
+            animation: terminalPulse 4s ease-in-out infinite alternate;
+        }
+
+        /* Simulates the subtle power fluctuation of server screens */
+        @keyframes terminalPulse {
+            0% { opacity: 0.75; }
+            100% { opacity: 1; }
         }
 
         .welcome-btn {
