@@ -112,7 +112,7 @@
         .theme-toggle svg { width: 22px; height: 22px; stroke-width: 2.5; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round;}
         .hidden { display: none !important; }
         
-        /* Main Container */
+     /* Main Container */
         .container {
             background: var(--panel-bg);
             padding: 50px 40px;
@@ -178,10 +178,8 @@
             align-items: center;
         }
 
-        @media (max-width: 600px) {
-            body { padding-top: 80px; } /* Pushes the entire box down on mobile only */
-            .container { padding: 40px 24px; }
-            .content-block { padding: 24px; }
+        @media (min-width: 600px) {
+            .ebook-grid { grid-template-columns: 1fr 1.5fr; }
         }
 
         .ebook-image-container {
@@ -224,11 +222,11 @@
         .btn-back:active { box-shadow: var(--button-pressed-shadow); transform: translateY(2px); }
 
         @media (max-width: 600px) {
-            body { padding-top: 100px; } /* Pushes the entire box down on mobile only */
+            body { padding-top: 80px; } /* Pushes the entire box down on mobile only */
             .container { padding: 40px 24px; }
             .content-block { padding: 24px; }
         }
-        
+    
     </style>
 </head>
 <body>
