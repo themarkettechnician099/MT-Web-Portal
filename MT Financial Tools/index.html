@@ -404,6 +404,76 @@
 
         .btn-confirm-delete:active { box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2); transform: translateY(2px); }
 
+        /* Welcome Splash Screen Architecture */
+        #welcome-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 10500; /* Sits directly beneath the Loading Screen, but above the App */
+            background-image: url('background.png');
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        /* Subtle theme-aware tint over your background art for readability */
+        .welcome-bg-overlay {
+            position: absolute;
+            inset: 0;
+            background-color: var(--board-bg);
+            opacity: 0.6; 
+            backdrop-filter: blur(4px);
+            z-index: -1;
+        }
+
+        .welcome-btn {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 32px;
+            padding: 40px 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            cursor: pointer;
+            box-shadow: var(--panel-shadow);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            width: auto;
+        }
+
+        .welcome-btn:hover {
+            box-shadow: 0 0 30px var(--brand-green-glow), var(--panel-shadow);
+            border-color: var(--brand-green);
+        }
+
+        .welcome-btn:active {
+            box-shadow: var(--button-pressed-shadow);
+            transform: scale(0.96);
+            border-color: transparent;
+        }
+
+        .welcome-btn img {
+            width: 120px;
+            height: auto;
+            filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.15));
+            transition: transform 0.3s ease;
+        }
+
+        .welcome-btn:hover img {
+            transform: scale(1.05);
+        }
+
+        .enter-text {
+            color: var(--brand-green);
+            font-weight: 800;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+        }
+        
         /* The Physical Panel */
         .container {
             background: var(--panel-bg); padding: 50px 40px; border-radius: 24px;
