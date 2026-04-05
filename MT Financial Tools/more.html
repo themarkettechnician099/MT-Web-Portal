@@ -222,9 +222,11 @@
         .btn-back:active { box-shadow: var(--button-pressed-shadow); transform: translateY(2px); }
 
         @media (max-width: 600px) {
+            body { padding-top: 100px; } /* Pushes the entire box down on mobile only */
             .container { padding: 40px 24px; }
             .content-block { padding: 24px; }
         }
+        
     </style>
 </head>
 <body>
