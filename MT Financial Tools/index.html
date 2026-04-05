@@ -753,5 +753,48 @@
     </script>
 
     <script type="module" src="app.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            const welcomeScreen = document.getElementById('welcome-screen');
+            const enterPortalBtn = document.getElementById('enter-portal-btn');
+
+            if (!welcomeScreen) return;
+
+            // RULE 1: Session Memory (Did they already click enter?)
+            if (sessionStorage.getItem('mt-intro-cleared') === 'true') {
+                welcomeScreen.classList.add('hidden');
+            }
+
+            // RULE 2: The Click
+            if (enterPortalBtn) {
+                enterPortalBtn.addEventListener('click', () => {
+                    sessionStorage.setItem('mt-intro-cleared', 'true');
+                    welcomeScreen.style.opacity = '0';
+                    setTimeout(() => welcomeScreen.classList.add('hidden'), 500);
+                });
+            }
+
+            // RULE 3: Auto-Bypass for Logged-In VIPs
+            // Give Firebase a millisecond to wake up, then check status
+            setTimeout(() => {
+                if (typeof firebase !== 'undefined') {
+                    firebase.auth().onAuthStateChanged((user) => {
+                        if (user) {
+                            sessionStorage.setItem('mt-intro-cleared', 'true');
+                            welcomeScreen.style.display = 'none'; // Instant kill
+                        }
+                    });
+                }
+            }, 300); 
+        });
+
+        // RULE 4: The Logout Reset
+        // If they click log out, wipe the memory so the Intro Screen comes back
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'logout-btn') {
+                sessionStorage.removeItem('mt-intro-cleared');
+            }
+        });
+    </script>
 </body>
 </html>
